@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "django-qlab"
+version = "0.1.0"
+description = "Dynamic query API for Django REST Framework"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [
+    {name = "Tabea Hoehne"}
+]
+keywords = ["django", "rest", "api", "query", "filter", "metadata"]
+classifiers = [
+    "Framework :: Django",
+    "Programming Language :: Python :: 3",
+]
+
+dependencies = [
+    "Django>=4.0",
+    "djangorestframework>=3.14",
+    "pydantic>=2.0",
+    "drf-spectacular>=0.26",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-django>=4.5",
+    "black>=23.0",
+    "ruff>=0.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/tabeahoehne132/django-qlab"
+Documentation = "https://github.com/tabeahoehne132/django-qlab#readme"
+Repository = "https://github.com/tabeahoehne132/django-qlab"
