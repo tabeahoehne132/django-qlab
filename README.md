@@ -27,7 +27,7 @@ A powerful Django REST Framework extension for dynamic model querying with advan
 
 ## Installation
 ```bash
-pip install django-qlab
+pip install git+https://github.com/tabeahoehne132/django-qlab.git
 ```
 
 ## Quick Start
