@@ -16,16 +16,16 @@ from typing import List, Union, Optional
 class ValidationError(Exception):
     """
     Custom exception for query validation errors.
-    
+
     Provides structured error information that can be serialized to JSON
     and returned to API clients with detailed validation feedback.
-    
+
     Attributes:
         _errors: List of error dictionaries, each containing:
             - loc: Tuple indicating error location (e.g., ("field",))
             - msg: Human-readable error message
             - type: Error type identifier (e.g., "value_error")
-    
+
     Example:
         >>> raise ValidationError([{
         ...     "loc": ("field",),
@@ -33,6 +33,7 @@ class ValidationError(Exception):
         ...     "type": "value_error"
         ... }])
     """
+
     def __init__(self, errors: List[dict]):
         self._errors = errors
         super().__init__()
@@ -40,34 +41,49 @@ class ValidationError(Exception):
     def errors(self) -> dict:
         """
         Get formatted error dictionary for API response.
-        
+
+        Converts internal error list into a unified, stable error shape
+        suitable for API consumers and typed clients.
+
         Returns:
-            Dictionary with "validation_error" key containing list of errors
-        
+            Dictionary with "errors" key containing list of formatted errors,
+            each with loc (list), msg (str), type (str), and code (str).
+
         Example:
             >>> try:
-            ...     raise ValidationError([{"loc": ("field",), "msg": "Invalid"}])
+            ...     raise ValidationError([{"loc": ("field",), "msg": "Invalid", "type": "value_error"}])
             ... except ValidationError as e:
             ...     print(e.errors())
-            {'validation_error': [{'loc': ('field',), 'msg': 'Invalid'}]}
+            {'errors': [{'loc': ['field'], 'msg': 'Invalid', 'type': 'value_error', 'code': 'VALUE_ERROR'}]}
         """
-        return {"validation_error": self._errors}
+        formatted = []
+        for error in self._errors:
+            error_type = error.get("type", "value_error")
+            formatted.append(
+                {
+                    "loc": list(error.get("loc", [])),
+                    "msg": error.get("msg", ""),
+                    "type": error_type,
+                    "code": error_type.upper().replace(".", "_"),
+                }
+            )
+        return {"errors": formatted}
 
 
 class Condition(BaseModel):
     """
     Represents a single filter condition in a query.
-    
+
     A Condition defines one filtering criterion consisting of:
     - field: The field path to filter on (e.g., "backup_job__name")
     - op: The comparison operation (e.g., "is", "gte", "icontains")
     - value: The value to compare against
-    
+
     Attributes:
         field: Field path using Django's __ syntax for relations
         op: Operation type (is, is_not, lt, lte, gt, gte, icontains)
         value: Value to compare (automatically converted for booleans)
-    
+
     Example:
         >>> cond = Condition(field="backup_size", op="gte", value="1000")
         >>> cond.field
@@ -76,12 +92,13 @@ class Condition(BaseModel):
         'gte'
         >>> cond.value
         '1000'
-        
+
         >>> # Boolean conversion
         >>> cond = Condition(field="is_active", op="is", value="true")
         >>> cond.value
         True
     """
+
     field: str
     op: str
     value: str
@@ -90,7 +107,7 @@ class Condition(BaseModel):
     def validate_op(cls, op: str) -> str:
         """
         Validate that the operation type is supported.
-        
+
         Supported operations:
             - is: Exact match (equality)
             - is_not: Negated exact match (inequality)
@@ -99,43 +116,47 @@ class Condition(BaseModel):
             - gt: Greater than
             - gte: Greater than or equal to
             - icontains: Case-insensitive substring search
-        
+
         Args:
             op: Operation string to validate
-        
+
         Returns:
             Validated operation string
-        
+
         Raises:
             ValidationError: If operation is not in allowed list
-        
+
         Example:
             >>> Condition(field="size", op="gte", value="100")  # Valid
             >>> Condition(field="size", op="invalid", value="100")  # Raises ValidationError
         """
         allowed_ops = ["is", "is_not", "lt", "lte", "gt", "gte", "icontains"]
         if op not in allowed_ops:
-            raise ValidationError([{
-                "loc": ("operation_type",),
-                "msg": f"The chosen operation type is not valid. Valid types are: {allowed_ops}",
-                "type": "value_error"
-            }])
+            raise ValidationError(
+                [
+                    {
+                        "loc": ("operation_type",),
+                        "msg": f"The chosen operation type is not valid. Valid types are: {allowed_ops}",
+                        "type": "value_error",
+                    }
+                ]
+            )
         return op
-    
+
     @field_validator("value")
     def validate_value(cls, value: str) -> Union[str, bool]:
         """
         Validate and convert value, handling boolean string conversion.
-        
+
         Automatically converts string representations of booleans to actual
         boolean values for proper database querying.
-        
+
         Args:
             value: String value from request
-        
+
         Returns:
             Converted value (bool if "true"/"false", otherwise original string)
-        
+
         Example:
             >>> # String to boolean conversion
             >>> cond = Condition(field="active", op="is", value="true")
@@ -144,7 +165,7 @@ class Condition(BaseModel):
             >>> cond = Condition(field="active", op="is", value="False")
             >>> cond.value
             False
-            
+
             >>> # Non-boolean values pass through
             >>> cond = Condition(field="name", op="is", value="test")
             >>> cond.value
@@ -161,25 +182,25 @@ class Condition(BaseModel):
 class Filter(BaseModel):
     """
     Represents complex nested filter logic with boolean operations.
-    
+
     A Filter can contain multiple Conditions or nested Filters combined
     using AND, OR, and NOT operations. This allows building arbitrarily
     complex query logic.
-    
+
     Operations:
         - and_operation: All conditions must be true (logical AND)
         - or_operation: At least one condition must be true (logical OR)
         - not_operation: Negate the conditions (logical NOT)
-    
+
     Attributes:
         and_operation: List of Filters/Conditions to AND together
         or_operation: List of Filters/Conditions to OR together
         not_operation: List of Filters/Conditions to negate
-    
+
     Note:
         At least one operation must be specified. Multiple operations can
         be combined in a single Filter (e.g., AND and OR together).
-    
+
     Example - Simple AND:
         >>> filter_obj = Filter(
         ...     and_operation=[
@@ -188,7 +209,7 @@ class Filter(BaseModel):
         ...     ]
         ... )
         >>> # Equivalent SQL: WHERE size > 100 AND active = true
-    
+
     Example - OR with nested AND:
         >>> filter_obj = Filter(
         ...     or_operation=[
@@ -202,7 +223,7 @@ class Filter(BaseModel):
         ...     ]
         ... )
         >>> # Equivalent SQL: WHERE priority = 'high' OR (priority = 'medium' AND age < 7)
-    
+
     Example - NOT operation:
         >>> filter_obj = Filter(
         ...     not_operation=[
@@ -210,7 +231,7 @@ class Filter(BaseModel):
         ...     ]
         ... )
         >>> # Equivalent SQL: WHERE NOT status = 'deleted'
-    
+
     Example - Complex combination:
         >>> filter_obj = Filter(
         ...     and_operation=[
@@ -224,10 +245,11 @@ class Filter(BaseModel):
         ...         Condition(field="archived", op="is", value="true")
         ...     ]
         ... )
-        >>> # Equivalent SQL: WHERE type = 'backup' 
+        >>> # Equivalent SQL: WHERE type = 'backup'
         >>> #                  AND (size > 1000 OR priority = 'high')
         >>> #                  AND NOT archived = true
     """
+
     and_operation: Optional[List[Union["Filter", Condition]]] = None
     or_operation: Optional[List[Union["Filter", Condition]]] = None
     not_operation: Optional[List[Union["Filter", Condition]]] = None

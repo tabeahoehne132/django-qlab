@@ -1,319 +1,116 @@
 """
-Django REST Framework serializers for query API responses.
+Django REST Framework serializers for the QLab query API.
 
-This module defines serializers for:
-- Model metadata responses (field information, allowed operations, lookups)
-- Query execution responses (paginated results)
-- Request validation (metadata requests)
-
-These serializers ensure consistent API response structure and provide
-automatic OpenAPI/Swagger documentation via drf-spectacular.
+Defines serializers for:
+- Field and model metadata responses
+- Paginated query results
+- Request validation
 """
 
 from rest_framework import serializers
 from qlab.helpers import model_exists
 
 
+# ---------------------------------------------------------------------------
+# Field & Model Metadata
+# ---------------------------------------------------------------------------
+
+
 class FieldMetadataSerializer(serializers.Serializer):
-    """
-    Serializer for individual field metadata.
-    
-    Represents all metadata for a single model field, including type information,
-    validation rules, and allowed filter operations.
-    
-    Fields:
-        name: Full field path (e.g., "backup_job__name" for related fields)
-        type: Field type identifier (string, integer, foreignkey, etc.)
-        label: Human-readable field label
-        required: Whether the field is required (not null and not blank)
-        related_model: Name of related model (for ForeignKey/M2M fields only)
-        allowed_operations: List of valid filter operations for this field type
-        max_length: Maximum character length (for text fields only)
-        choices: Available choices (for choice fields only)
-    
-    Example Response:
-        {
-            "name": "backup_size",
-            "type": "bigint",
-            "label": "Backup Size",
-            "required": false,
-            "allowed_operations": ["is", "is_not", "lt", "lte", "gt", "gte"],
-            "max_length": null,
-            "choices": null,
-            "related_model": null
-        }
-    
-    Example Response (ForeignKey):
-        {
-            "name": "backup_job",
-            "type": "foreignkey",
-            "label": "Backup Job",
-            "required": true,
-            "allowed_operations": ["is", "is_not"],
-            "related_model": "BackupJob"
-        }
-    
-    Example Response (Choice Field):
-        {
-            "name": "status",
-            "type": "string",
-            "label": "Status",
-            "required": true,
-            "allowed_operations": ["is", "is_not", "icontains"],
-            "max_length": 20,
-            "choices": [
-                {"value": "active", "label": "Active"},
-                {"value": "inactive", "label": "Inactive"}
-            ]
-        }
-    """
-    name = serializers.CharField(
-        help_text="Full field path including relations (e.g., 'backup_job__name')"
-    )
+    """Metadata for a single model field, including type, operations and relation info."""
+
+    name = serializers.CharField(help_text="Full field path, e.g. 'author__first_name'")
     type = serializers.CharField(
-        help_text="Field type: string, integer, boolean, foreignkey, etc."
+        help_text="Field type: string, integer, boolean, foreignkey, reverse_relation, etc."
     )
-    label = serializers.CharField(
-        help_text="Human-readable field label"
-    )
+    label = serializers.CharField(help_text="Human-readable field label")
     required = serializers.BooleanField(
-        help_text="Whether this field is required (not null and not blank)"
+        help_text="True if the field is not null and not blank"
+    )
+    primary_key = serializers.BooleanField(
+        default=False, help_text="True if this field is the primary key"
+    )
+    allowed_operations = serializers.ListField(
+        child=serializers.CharField(),
+        help_text="Valid filter operations: is, is_not, lt, lte, gt, gte, icontains",
     )
     related_model = serializers.CharField(
         required=False,
         allow_null=True,
-        help_text="Name of related model (for ForeignKey/ManyToMany fields only)"
+        help_text="Related model name (FK, M2M and reverse relations only)",
     )
-    allowed_operations = serializers.ListField(
-        child=serializers.CharField(),
-        help_text="List of valid filter operations: is, is_not, lt, lte, gt, gte, icontains"
+    filter_name = serializers.CharField(
+        required=False,
+        allow_null=True,
+        help_text="Query name to use in filter_fields (reverse relations only)",
     )
     max_length = serializers.IntegerField(
         required=False,
         allow_null=True,
-        help_text="Maximum character length (for text fields only)"
+        help_text="Maximum character length (text fields only)",
     )
     choices = serializers.ListField(
         required=False,
         allow_null=True,
-        help_text="Available choices with value/label pairs (for choice fields only)"
+        help_text="Available choices as {value, label} pairs (choice fields only)",
     )
 
 
 class ModelMetadataSerializer(serializers.Serializer):
-    """
-    Serializer for complete model metadata.
-    
-    Represents all metadata for a Django model, including all fields
-    (both direct and related) and a complete list of valid lookup paths
-    for autocomplete functionality.
-    
-    Fields:
-        model_name: Name of the Django model
-        app_label: Django app containing the model
-        fields: List of all field metadata (includes nested relations)
-        all_lookups: Sorted list of all valid field paths for autocomplete
-    
-    Usage:
-        Used by the metadata endpoint to provide comprehensive model information
-        for building query UIs with autocomplete, validation, and field type hints.
-    
-    Example Response:
-        {
-            "model_name": "Backup",
-            "app_label": "core",
-            "fields": [
-                {
-                    "name": "id",
-                    "type": "integer",
-                    "label": "ID",
-                    "required": true,
-                    "allowed_operations": ["is", "is_not", "lt", "lte", "gt", "gte"]
-                },
-                {
-                    "name": "backup_job__name",
-                    "type": "string",
-                    "label": "Name",
-                    "required": true,
-                    "allowed_operations": ["is", "is_not", "icontains"],
-                    "max_length": 255,
-                    "related_model": "BackupJob"
-                }
-            ],
-            "all_lookups": [
-                "backup_date",
-                "backup_job",
-                "backup_job__id",
-                "backup_job__name",
-                "backup_size",
-                "id"
-            ]
-        }
-    """
-    model_name = serializers.CharField(
-        help_text="Name of the Django model"
-    )
+    """Complete metadata for a Django model, including all fields and valid lookup paths."""
+
+    model_name = serializers.CharField(help_text="Name of the Django model")
     app_label = serializers.CharField(
         help_text="Django app label containing this model"
     )
+    primary_key_field = serializers.CharField(help_text="Name of the primary key field")
     fields = FieldMetadataSerializer(
-        many=True,
-        help_text="List of all field metadata including nested relations"
+        many=True, help_text="All field metadata including nested relations"
     )
     all_lookups = serializers.ListField(
         child=serializers.CharField(),
-        help_text="Sorted list of all valid field paths for autocomplete"
+        help_text="Sorted list of all valid field paths for autocomplete",
     )
+
+
+# ---------------------------------------------------------------------------
+# Request Validation
+# ---------------------------------------------------------------------------
 
 
 class MetaDataRequestSerializer(serializers.Serializer):
-    """
-    Serializer for metadata request validation.
-    
-    Validates that the requested model exists before attempting to
-    retrieve its metadata.
-    
-    Fields:
-        model: Name of the Django model to retrieve metadata for
-    
-    Validation:
-        - Checks that the model exists in any installed Django app
-        - Case-insensitive model name matching
-    
-    Example Request:
-        {
-            "model": "Backup"
-        }
-    
-    Example Validation Error:
-        {
-            "model": ["This model does not exist."]
-        }
-    """
+    """Validates that the requested model exists before retrieving its metadata."""
+
     model = serializers.CharField(
-        help_text="Name of the Django model (case-insensitive)"
+        help_text="Model name to retrieve metadata for (case-insensitive)"
     )
 
-    def validate_model(self, model: str) -> str:
-        """
-        Validate that the requested model exists.
-        
-        Args:
-            model: Model name to validate
-        
-        Returns:
-            Validated model name
-        
-        Raises:
-            serializers.ValidationError: If model doesn't exist in any app
-        
-        Example:
-            >>> serializer = MetaDataRequestSerializer(data={"model": "VeeamBackup"})
-            >>> serializer.is_valid()
-            True
-            >>> serializer = MetaDataRequestSerializer(data={"model": "InvalidModel"})
-            >>> serializer.is_valid()
-            False
-            >>> serializer.errors
-            {'model': ['This model does not exist.']}
-        """
-        if not model_exists(model):
+    def validate_model(self, value: str) -> str:
+        if not model_exists(value):
             raise serializers.ValidationError("This model does not exist.")
-        return model
+        return value
+
+
+# ---------------------------------------------------------------------------
+# Query Response
+# ---------------------------------------------------------------------------
 
 
 class ResponseSerializer(serializers.Serializer):
-    """
-    Serializer for paginated query responses.
-    
-    Provides structured pagination metadata along with query results.
-    Follows standard pagination patterns for consistent API responses.
-    
-    Fields:
-        count: Total number of results across all pages
-        page: Current page number (1-indexed)
-        page_size: Number of results per page (default: 100)
-        total_pages: Total number of pages available
-        next: Next page number (null if on last page)
-        previous: Previous page number (null if on first page)
-        results: List of result objects with selected fields
-    
-    Pagination:
-        - Page size is fixed at 100 items
-        - Pages are 1-indexed (first page is 1, not 0)
-        - Next/previous are page numbers, not URLs
-    
-    Example Response (First Page):
-        {
-            "count": 250,
-            "page": 1,
-            "page_size": 100,
-            "total_pages": 3,
-            "next": 2,
-            "previous": null,
-            "results": [
-                {"id": 1, "name": "Backup 1", "size": 1024},
-                {"id": 2, "name": "Backup 2", "size": 2048},
-                ...
-            ]
-        }
-    
-    Example Response (Middle Page):
-        {
-            "count": 250,
-            "page": 2,
-            "page_size": 100,
-            "total_pages": 3,
-            "next": 3,
-            "previous": 1,
-            "results": [...]
-        }
-    
-    Example Response (Last Page):
-        {
-            "count": 250,
-            "page": 3,
-            "page_size": 100,
-            "total_pages": 3,
-            "next": null,
-            "previous": 2,
-            "results": [
-                {"id": 201, "name": "Backup 201", "size": 512},
-                ...
-            ]
-        }
-    
-    Example Response (Empty Results):
-        {
-            "count": 0,
-            "page": 1,
-            "page_size": 100,
-            "total_pages": 0,
-            "next": null,
-            "previous": null,
-            "results": []
-        }
-    """
+    """Paginated query response with result list and pagination metadata."""
+
     count = serializers.IntegerField(
-        help_text="Total number of results across all pages"
+        help_text="Total number of matching records across all pages"
     )
-    page = serializers.IntegerField(
-        help_text="Current page number (1-indexed)"
-    )
-    page_size = serializers.IntegerField(
-        help_text="Number of results per page (fixed at 100)"
-    )
-    total_pages = serializers.IntegerField(
-        help_text="Total number of pages available"
-    )
+    page = serializers.IntegerField(help_text="Current page number (1-indexed)")
+    page_size = serializers.IntegerField(help_text="Number of records per page")
+    total_pages = serializers.IntegerField(help_text="Total number of pages")
     next = serializers.IntegerField(
-        allow_null=True,
-        help_text="Next page number (null if on last page)"
+        allow_null=True, help_text="Next page number, null if on last page"
     )
     previous = serializers.IntegerField(
-        allow_null=True,
-        help_text="Previous page number (null if on first page)"
+        allow_null=True, help_text="Previous page number, null if on first page"
     )
     results = serializers.ListField(
-        help_text="List of result objects with selected fields"
+        help_text="List of result objects with the requested fields"
     )
