@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "django-qlab"
-version = "0.2.1"
+version = "0.2.2"
 description = "Dynamic query API for Django REST Framework"
 readme = "README.md"
 requires-python = ">=3.9"
