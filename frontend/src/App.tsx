@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { NavSidebar, TabId, ThemeMode } from './components/NavSidebar'
 import { ContentSidebar, DocsNavGroup, DocsNavItem, RecentQuery } from './components/ContentSidebar'
 import { QueriesPage } from './pages/QueriesPage'
-import { HomePage } from './pages/HomePage'
 import {
   DocsEntry,
   DocsPage,
@@ -43,10 +42,10 @@ const TOUR_STEPS: Array<{
   selector: string
 }> = [
   {
-    title: 'Start with the left sidebar',
-    body: 'Start on the dashboard, then move into Queries or Models once you know what you want to inspect.',
-    tab: 'home',
-    selector: '.home-page',
+    title: 'Start in the query builder',
+    body: 'Pick a model in the left sidebar, choose fields, then build up filters without writing lookups by hand.',
+    tab: 'queries',
+    selector: '.query-builder-card',
   },
   {
     title: 'Build queries interactively',
@@ -330,7 +329,7 @@ interface ToastItem {
 // ─── App ─────────────────────────────────────────────────────────────────────
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<TabId>('home')
+  const [activeTab, setActiveTab] = useState<TabId>('queries')
   const [activeModel, setActiveModel] = useState<string>('')
   const [activeSettingsKey, setActiveSettingsKey] = useState<string>('general')
   const [activeDocsKey, setActiveDocsKey] = useState<string>('overview')
@@ -359,6 +358,20 @@ export default function App() {
   const [activeHistoryRange, setActiveHistoryRange] = useState<HistoryRange>('all')
   const [toasts, setToasts] = useState<ToastItem[]>([])
 
+  const normalizeTab = (tab: string | null | undefined): TabId => {
+    switch (tab) {
+      case 'models':
+      case 'saved':
+      case 'history':
+      case 'settings':
+      case 'docs':
+      case 'queries':
+        return tab
+      default:
+        return 'queries'
+    }
+  }
+
   const pushToast = (tone: ToastTone, message: string) => {
     const id = Date.now() + Math.floor(Math.random() * 1000)
     setToasts((current) => [...current, { id, tone, message }])
@@ -386,7 +399,7 @@ export default function App() {
         setSavedQueries(bootstrap.saved_queries)
         setActiveSavedQueryId(bootstrap.saved_queries[0]?.id ?? null)
         setActiveModel(bootstrap.models[0]?.model_name || '')
-        setActiveTab((bootstrap.settings.last_active_tab as TabId) || 'queries')
+        setActiveTab(normalizeTab(bootstrap.settings.last_active_tab))
         setActiveDocsKey(bootstrap.settings.active_docs_key || 'overview')
         setActiveSettingsKey(bootstrap.settings.active_settings_key || 'general')
         setDefaultPageSize(bootstrap.settings.default_page_size || 100)
@@ -735,12 +748,6 @@ export default function App() {
     pushToast('success', 'QLab tour completed.')
   }
 
-  const openTour = () => {
-    setTourSeen(false)
-    setTourStep(0)
-    setActiveTab('home')
-  }
-
   const now = Date.now()
   const historyModelCounts = historyItems.reduce<Record<string, number>>((acc, item) => {
     acc[item.model_name] = (acc[item.model_name] || 0) + 1
@@ -820,36 +827,34 @@ export default function App() {
         userInitials="TH"
       />
 
-      {activeTab !== 'home' && (
-        <ContentSidebar
-          activeTab={activeTab}
-          models={models}
-          recentQueries={recentQueries}
-          recentModelNames={recentModelNames}
-          activeModel={activeModel}
-          savedQueries={savedQueryNavItems}
-          activeSavedQueryId={activeSavedQueryId}
-          historyModelOptions={Object.entries(historyModelCounts).map(([label, count]) => ({ label, count }))}
-          activeHistoryModel={activeHistoryModel}
-          onHistoryModelSelect={setActiveHistoryModel}
-          activeHistoryRange={activeHistoryRange}
-          onHistoryRangeSelect={setActiveHistoryRange}
-          settingsItems={SETTINGS_NAV_ITEMS}
-          activeSettingsKey={activeSettingsKey}
-          onSettingsSelect={setActiveSettingsKey}
-          docsGroups={DOCS_GROUPS}
-          activeDocsKey={activeDocsKey}
-          onDocsSelect={setActiveDocsKey}
-          onModelSelect={handleModelSelect}
-          onSavedQuerySelect={(id) => {
-            setActiveSavedQueryId(id)
-            setActiveTab('saved')
-          }}
-          onToggleModelFavorite={handleToggleModelFavorite}
-          onRecentQuerySelect={handleRecentQuerySelect}
-          environment="LOCAL · DEV"
-        />
-      )}
+      <ContentSidebar
+        activeTab={activeTab}
+        models={models}
+        recentQueries={recentQueries}
+        recentModelNames={recentModelNames}
+        activeModel={activeModel}
+        savedQueries={savedQueryNavItems}
+        activeSavedQueryId={activeSavedQueryId}
+        historyModelOptions={Object.entries(historyModelCounts).map(([label, count]) => ({ label, count }))}
+        activeHistoryModel={activeHistoryModel}
+        onHistoryModelSelect={setActiveHistoryModel}
+        activeHistoryRange={activeHistoryRange}
+        onHistoryRangeSelect={setActiveHistoryRange}
+        settingsItems={SETTINGS_NAV_ITEMS}
+        activeSettingsKey={activeSettingsKey}
+        onSettingsSelect={setActiveSettingsKey}
+        docsGroups={DOCS_GROUPS}
+        activeDocsKey={activeDocsKey}
+        onDocsSelect={setActiveDocsKey}
+        onModelSelect={handleModelSelect}
+        onSavedQuerySelect={(id) => {
+          setActiveSavedQueryId(id)
+          setActiveTab('saved')
+        }}
+        onToggleModelFavorite={handleToggleModelFavorite}
+        onRecentQuerySelect={handleRecentQuerySelect}
+        environment="LOCAL · DEV"
+      />
 
       <div className="app-body">
         <div className="toast-stack">
@@ -893,22 +898,6 @@ export default function App() {
               </div>
             </div>
           </div>
-        )}
-        {activeTab === 'home' && (
-          <HomePage
-            models={models}
-            recentQueries={recentQueries}
-            activeModel={activeModel}
-            savedQueryCount={savedQueries.length}
-            historyCount={historyItems.length}
-            onTabChange={setActiveTab}
-            onStartTour={openTour}
-            onModelSelect={(name) => {
-              handleModelSelect(name)
-              setActiveTab('models')
-            }}
-            onRecentQuerySelect={handleRecentQuerySelect}
-          />
         )}
         {activeTab === 'queries' && (
           <QueriesPage

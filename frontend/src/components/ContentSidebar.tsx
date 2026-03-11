@@ -181,18 +181,6 @@ export const ContentSidebar: React.FC<ContentSidebarProps> = ({
         />
       )}
 
-      {activeTab === 'home' && (
-        <QueriesSidebarPanel
-          models={models}
-          recentQueries={recentQueries}
-          recentModelNames={recentModelNames}
-          activeModel={activeModel}
-          onModelSelect={onModelSelect}
-          onToggleModelFavorite={onToggleModelFavorite}
-          onRecentQuerySelect={onRecentQuerySelect}
-        />
-      )}
-
       {activeTab === 'models' && (
         <ModelsSidebarPanel
           models={models}
@@ -268,15 +256,12 @@ const QueryModelPanel: React.FC<QueryModelPanelProps> = ({
   ), [models, query])
 
   const favoriteNames = new Set(filteredModels.filter((model) => model.favorite).map((model) => model.name))
-  const recentNameSet = new Set(recentModelNames)
   const favorites = filteredModels.filter((model) => favoriteNames.has(model.name))
   const recentModels = recentModelNames
     .map((name) => filteredModels.find((model) => model.name === name))
     .filter((model): model is ModelEntry => model !== undefined)
     .filter((model) => !favoriteNames.has(model.name))
-  const grouped = groupModels(
-    filteredModels.filter((model) => !favoriteNames.has(model.name) && !recentNameSet.has(model.name)),
-  )
+  const grouped = groupModels(filteredModels)
 
   return (
     <div>

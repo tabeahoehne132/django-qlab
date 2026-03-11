@@ -1,7 +1,7 @@
 import React from 'react'
 import './NavSidebar.css'
 
-export type TabId = 'home' | 'queries' | 'models' | 'saved' | 'history' | 'settings' | 'docs'
+export type TabId = 'queries' | 'models' | 'saved' | 'history' | 'settings' | 'docs'
 export type ThemeMode = 'dark' | 'light'
 
 interface NavSidebarProps {
@@ -17,13 +17,6 @@ const IconSearch = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="11" cy="11" r="8"/>
     <path d="m21 21-4.35-4.35"/>
-  </svg>
-)
-
-const IconHome = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M3 10.5 12 3l9 7.5" />
-    <path d="M5 9.5V21h14V9.5" />
   </svg>
 )
 
@@ -125,7 +118,6 @@ export const NavSidebar: React.FC<NavSidebarProps> = ({
       </div>
 
       <div className="nav-items">
-        <NavItem tab="home"     tip="Home"          icon={<IconHome />}     active={activeTab === 'home'}     onClick={() => onTabChange('home')} />
         <NavItem tab="queries"  tip="Queries"       icon={<IconSearch />}   active={activeTab === 'queries'}  onClick={() => onTabChange('queries')} />
         <NavItem tab="models"   tip="Models"        icon={<IconModels />}   active={activeTab === 'models'}   onClick={() => onTabChange('models')} />
         <NavItem tab="saved"    tip="Saved Queries" icon={<IconBookmark />} active={activeTab === 'saved'}    onClick={() => onTabChange('saved')} />

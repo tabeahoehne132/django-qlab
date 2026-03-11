@@ -154,7 +154,7 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({
             </div>
           </div>
           <div className="result-tabs">
-            <button className="rtab active">Fields</button>
+            <button className="rtab active">Selectable Fields</button>
           </div>
           <div className="table-scroll">
             <table className="field-table">
