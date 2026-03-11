@@ -1,0 +1,178 @@
+.app-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  height: 100vh;
+  position: relative;
+}
+
+.app-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background:
+    radial-gradient(ellipse at top left,    rgba(0, 212, 170, 0.1),  transparent 32%),
+    radial-gradient(ellipse at bottom right, rgba(74, 158, 255, 0.1), transparent 36%),
+    var(--bg);
+}
+
+.app-screen-panel {
+  width: min(420px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 22px;
+  border-radius: 12px;
+  border: 1px solid var(--border2);
+  background: var(--panel-tint-strong);
+  box-shadow: var(--shadow-pop);
+}
+
+.app-screen-panel strong {
+  font-size: 1rem;
+  color: var(--text);
+}
+
+.app-screen-panel span {
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: var(--muted2);
+}
+
+.app-screen-panel.error {
+  border-color: rgba(239, 68, 68, 0.25);
+}
+
+.tour-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(5, 10, 18, 0.18);
+  backdrop-filter: blur(2px);
+  z-index: 500;
+  padding: 24px;
+}
+
+.tour-card {
+  width: min(420px, 100%);
+  background: var(--panel-tint-strong);
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  box-shadow: var(--shadow-pop);
+  padding: 22px;
+  position: absolute;
+  z-index: 2;
+}
+
+.tour-kicker,
+.tour-progress {
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.tour-kicker {
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+
+.tour-title {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.tour-body {
+  font-size: 0.82rem;
+  line-height: 1.6;
+  color: var(--muted2);
+  margin-bottom: 18px;
+}
+
+.tour-progress {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 18px;
+}
+
+.tour-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--border2);
+}
+
+.tour-dot.active {
+  background: var(--accent);
+}
+
+.tour-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.toast-stack {
+  position: absolute;
+  top: 16px;
+  right: 18px;
+  z-index: 520;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.toast-item {
+  min-width: 220px;
+  max-width: 340px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border2);
+  background: var(--panel-tint-strong);
+  color: var(--text);
+  box-shadow: var(--shadow-pop);
+  font-size: 0.76rem;
+}
+
+.toast-item.success {
+  border-color: rgba(34, 197, 94, 0.28);
+}
+
+.toast-item.error {
+  border-color: rgba(239, 68, 68, 0.28);
+}
+
+@media (max-width: 920px) {
+  #qlab-root {
+    flex-direction: column;
+    height: auto;
+    min-height: 100vh;
+    overflow: auto;
+  }
+
+  .app-body {
+    height: auto;
+    min-height: 0;
+  }
+
+  .toast-stack {
+    left: 12px;
+    right: 12px;
+    top: 12px;
+  }
+
+  .toast-item {
+    max-width: none;
+  }
+
+  .tour-card {
+    left: 16px !important;
+    right: 16px;
+    width: auto;
+    top: auto !important;
+    bottom: 16px;
+  }
+}

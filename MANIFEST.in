@@ -1,5 +1,7 @@
 include README.md
 include LICENSE
 recursive-include qlab *.py
+recursive-include qlab/templates *
+recursive-include qlab/static *
 global-exclude __pycache__
 global-exclude *.pyc

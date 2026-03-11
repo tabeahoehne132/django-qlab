@@ -12,6 +12,14 @@ setup(
     long_description_content_type="text/markdown",
     url="https://github.com/tabeahoehne132/django-qlab",
     packages=find_packages(),
+    package_data={
+        "qlab": [
+            "templates/qlab/*.html",
+            "static/qlab/*.js",
+            "static/qlab/*.css",
+            "static/qlab/assets/*",
+        ],
+    },
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",

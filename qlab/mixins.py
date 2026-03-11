@@ -14,7 +14,10 @@ Usage:
 
 from django.apps import apps
 from django.core.paginator import Paginator
+from django.core.paginator import EmptyPage, PageNotAnInteger
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import Q
+from django.utils import timezone
 from drf_spectacular.utils import extend_schema, OpenApiExample, inline_serializer
 from rest_framework import serializers
 from rest_framework.response import Response
@@ -29,6 +32,7 @@ from qlab.serializers import (
 )
 from qlab.settings import qlab_settings
 from typing import Optional
+from time import monotonic
 
 # Reusable error response schema for Swagger
 _ERROR_SCHEMA = inline_serializer(
@@ -69,6 +73,72 @@ def _check_restricted(model_name: str) -> Optional[Response]:
     return None
 
 
+def _check_allowed_app(app_label: str) -> Optional[Response]:
+    """Return a 403 Response if the app is not allowed, else None."""
+    allowed_apps = qlab_settings.ALLOWED_APPS or []
+    if allowed_apps and app_label not in allowed_apps:
+        return Response(
+            {
+                "errors": [
+                    {
+                        "loc": ["app_label"],
+                        "msg": f"App '{app_label}' is not enabled for QLab.",
+                        "type": "value_error.app_not_allowed",
+                        "code": "VALUE_ERROR_APP_NOT_ALLOWED",
+                    }
+                ]
+            },
+            status=403,
+        )
+    return None
+
+
+def _record_query_history(
+    request,
+    *,
+    payload,
+    app_label: str,
+    model_name: str,
+    status: str,
+    duration_ms: Optional[int] = None,
+    result_count: Optional[int] = None,
+    error_message: str = "",
+) -> None:
+    """Persist query execution history for authenticated users only."""
+    if not getattr(request.user, "is_authenticated", False):
+        return
+
+    try:
+        from qlab.models import QueryRunHistory, SavedQuery
+
+        saved_query = None
+        saved_query_id = payload.get("saved_query_id")
+        if saved_query_id:
+            saved_query = SavedQuery.objects.filter(
+                pk=saved_query_id,
+                user=request.user,
+            ).first()
+            if saved_query and status == "success":
+                saved_query.last_run_at = timezone.now()
+                saved_query.save(update_fields=["last_run_at"])
+
+        QueryRunHistory.objects.create(
+            user=request.user,
+            saved_query=saved_query,
+            title=payload.get("title", ""),
+            app_label=app_label,
+            model_name=model_name,
+            query_payload=payload,
+            status=status,
+            duration_ms=duration_ms,
+            result_count=result_count,
+            error_message=error_message,
+        )
+    except Exception:
+        # Query execution must not fail because optional history logging failed.
+        pass
+
+
 class QLabMixin:
     """
     Mixin for DRF ViewSets that enables dynamic QLab queries.
@@ -105,6 +175,204 @@ class QLabMixin:
             A QuerySet of model instances to query against.
         """
         return model.objects.all()
+
+    def execute_query(self, request, payload):
+        """Execute a QLab query payload and return a DRF Response."""
+        started_at = monotonic()
+        requested_model = payload.get("model", "")
+        app_label = payload.get("app_label", qlab_settings.DEFAULT_APP_LABEL)
+        try:
+            query = QueryFilter(
+                model=payload["model"],
+                select_fields=payload["select_fields"],
+                filter_fields=payload.get("filter_fields", None),
+                page=payload.get("page", 1),
+                app_label=payload.get("app_label", qlab_settings.DEFAULT_APP_LABEL),
+            )
+        except ValidationError as e:
+            _record_query_history(
+                request,
+                payload=payload,
+                app_label=app_label,
+                model_name=requested_model or "unknown",
+                status="failed",
+                duration_ms=int((monotonic() - started_at) * 1000),
+                error_message=str(e),
+            )
+            return Response(e.errors(), status=400)
+        except KeyError as e:
+            _record_query_history(
+                request,
+                payload=payload,
+                app_label=app_label,
+                model_name=requested_model or "unknown",
+                status="failed",
+                duration_ms=int((monotonic() - started_at) * 1000),
+                error_message=f"{e.args[0]} is required.",
+            )
+            return Response(
+                {
+                    "errors": [
+                        {
+                            "loc": [e.args[0]],
+                            "msg": f"{e.args[0]} is required.",
+                            "type": "value_error.missing",
+                            "code": "VALUE_ERROR_MISSING",
+                        }
+                    ]
+                },
+                status=400,
+            )
+
+        app_label = query.app_label or qlab_settings.DEFAULT_APP_LABEL
+        allowed_app = _check_allowed_app(app_label)
+        if allowed_app:
+            _record_query_history(
+                request,
+                payload=payload,
+                app_label=app_label,
+                model_name=query.model,
+                status="failed",
+                duration_ms=int((monotonic() - started_at) * 1000),
+                error_message=f"App '{app_label}' is not enabled for QLab.",
+            )
+            return allowed_app
+        restricted = _check_restricted(query.model)
+        if restricted:
+            _record_query_history(
+                request,
+                payload=payload,
+                app_label=app_label,
+                model_name=query.model,
+                status="failed",
+                duration_ms=int((monotonic() - started_at) * 1000),
+                error_message=f"Model '{query.model}' is restricted and cannot be queried.",
+            )
+            return restricted
+        try:
+            model = apps.get_model(app_label, query.model)
+        except LookupError:
+            _record_query_history(
+                request,
+                payload=payload,
+                app_label=app_label,
+                model_name=query.model,
+                status="failed",
+                duration_ms=int((monotonic() - started_at) * 1000),
+                error_message=f"Model '{query.model}' does not exist in app '{app_label}'.",
+            )
+            return Response(
+                {
+                    "errors": [
+                        {
+                            "loc": ["model"],
+                            "msg": f"Model '{query.model}' does not exist in app '{app_label}'.",
+                            "type": "value_error",
+                            "code": "VALUE_ERROR",
+                        }
+                    ]
+                },
+                status=400,
+            )
+
+        filter_fields = getattr(query, "filter_fields", None)
+        q_obj = build_q(query.filter_fields) if filter_fields else Q()
+
+        # Always include PK in results even if not in select_fields
+        pk_field = model._meta.pk.name
+        select_fields = list(query.select_fields)
+        pk_included = pk_field in select_fields
+        if not pk_included:
+            select_fields = [pk_field] + select_fields
+
+        # Apply custom scoping via get_queryset(), then apply QLab filters on top
+        try:
+            raw_results = (
+                self.get_queryset(model).filter(q_obj).order_by("id").values(*select_fields)
+            )
+
+            page_size = min(
+                payload.get("page_size", qlab_settings.PAGE_SIZE),
+                qlab_settings.MAX_PAGE_SIZE,
+            )
+            paginator = Paginator(raw_results, page_size)
+            try:
+                page_obj = paginator.page(query.page)
+            except (PageNotAnInteger, EmptyPage):
+                _record_query_history(
+                    request,
+                    payload=payload,
+                    app_label=app_label,
+                    model_name=query.model,
+                    status="failed",
+                    duration_ms=int((monotonic() - started_at) * 1000),
+                    error_message=f"Page '{query.page}' is out of range.",
+                )
+                return Response(
+                    {
+                        "errors": [
+                            {
+                                "loc": ["page"],
+                                "msg": f"Page '{query.page}' is out of range.",
+                                "type": "value_error.page",
+                                "code": "VALUE_ERROR_PAGE",
+                            }
+                        ]
+                    },
+                    status=400,
+                )
+        except (ValueError, TypeError, DjangoValidationError) as e:
+            _record_query_history(
+                request,
+                payload=payload,
+                app_label=app_label,
+                model_name=query.model,
+                status="failed",
+                duration_ms=int((monotonic() - started_at) * 1000),
+                error_message=str(e),
+            )
+            return Response(
+                {
+                    "errors": [
+                        {
+                            "loc": ["filter_fields"],
+                            "msg": "One or more filter values are invalid for the selected field.",
+                            "type": "value_error.filter",
+                            "code": "VALUE_ERROR_FILTER",
+                        }
+                    ]
+                },
+                status=400,
+            )
+
+        if not pk_included:
+            results = [{"id": row[pk_field], **row} for row in page_obj.object_list]
+        else:
+            results = list(page_obj.object_list)
+
+        data = {
+            "count": paginator.count,
+            "page": page_obj.number,
+            "page_size": page_size,
+            "total_pages": paginator.num_pages,
+            "next": page_obj.next_page_number() if page_obj.has_next() else None,
+            "previous": page_obj.previous_page_number()
+            if page_obj.has_previous()
+            else None,
+            "results": results,
+        }
+
+        _record_query_history(
+            request,
+            payload=payload,
+            app_label=app_label,
+            model_name=query.model,
+            status="success",
+            duration_ms=int((monotonic() - started_at) * 1000),
+            result_count=paginator.count,
+        )
+
+        return Response(ResponseSerializer(data).data)
 
     @extend_schema(
         summary="Execute Dynamic Query",
@@ -151,79 +419,7 @@ class QLabMixin:
     )
     def post(self, request):
         """Execute a dynamic QLab query."""
-        try:
-            query = QueryFilter(
-                model=request.data["model"],
-                select_fields=request.data["select_fields"],
-                filter_fields=request.data.get("filter_fields", None),
-                page=request.data.get("page", 1),
-                app_label=request.data.get(
-                    "app_label", qlab_settings.DEFAULT_APP_LABEL
-                ),
-            )
-        except ValidationError as e:
-            return Response(e.errors(), status=400)
-        except KeyError as e:
-            return Response(
-                {
-                    "errors": [
-                        {
-                            "loc": [e.args[0]],
-                            "msg": f"{e.args[0]} is required.",
-                            "type": "value_error.missing",
-                            "code": "VALUE_ERROR_MISSING",
-                        }
-                    ]
-                },
-                status=400,
-            )
-
-        app_label = query.app_label or qlab_settings.DEFAULT_APP_LABEL
-        restricted = _check_restricted(query.model)
-        if restricted:
-            return restricted
-        model = apps.get_model(app_label, query.model)
-
-        filter_fields = getattr(query, "filter_fields", None)
-        q_obj = build_q(query.filter_fields) if filter_fields else Q()
-
-        # Always include PK in results even if not in select_fields
-        pk_field = model._meta.pk.name
-        select_fields = list(query.select_fields)
-        pk_included = pk_field in select_fields
-        if not pk_included:
-            select_fields = [pk_field] + select_fields
-
-        # Apply custom scoping via get_queryset(), then apply QLab filters on top
-        raw_results = (
-            self.get_queryset(model).filter(q_obj).order_by("id").values(*select_fields)
-        )
-
-        page_size = min(
-            request.data.get("page_size", qlab_settings.PAGE_SIZE),
-            qlab_settings.MAX_PAGE_SIZE,
-        )
-        paginator = Paginator(raw_results, page_size)
-        page_obj = paginator.page(query.page)
-
-        if not pk_included:
-            results = [{"id": row[pk_field], **row} for row in page_obj.object_list]
-        else:
-            results = list(page_obj.object_list)
-
-        data = {
-            "count": paginator.count,
-            "page": page_obj.number,
-            "page_size": page_size,
-            "total_pages": paginator.num_pages,
-            "next": page_obj.next_page_number() if page_obj.has_next() else None,
-            "previous": page_obj.previous_page_number()
-            if page_obj.has_previous()
-            else None,
-            "results": results,
-        }
-
-        return Response(ResponseSerializer(data).data)
+        return self.execute_query(request, request.data)
 
 
 class NeighborhoodMixin:
@@ -354,6 +550,9 @@ class NeighborhoodMixin:
             )
 
         # --- Resolve model ---
+        allowed_app = _check_allowed_app(app_label)
+        if allowed_app:
+            return allowed_app
         restricted = _check_restricted(model_name)
         if restricted:
             return restricted
@@ -498,6 +697,9 @@ class QLabMetadataMixin:
         model_name = serializer.validated_data["model"]
         app_label = request.data.get("app_label", qlab_settings.DEFAULT_APP_LABEL)
 
+        allowed_app = _check_allowed_app(app_label)
+        if allowed_app:
+            return allowed_app
         restricted = _check_restricted(model_name)
         if restricted:
             return restricted

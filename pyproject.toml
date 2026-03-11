@@ -33,6 +33,14 @@ dev = [
     "ruff>=0.1",
 ]
 
+[tool.setuptools.package-data]
+qlab = [
+    "templates/qlab/*.html",
+    "static/qlab/*.js",
+    "static/qlab/*.css",
+    "static/qlab/assets/*",
+]
+
 [project.urls]
 Homepage = "https://github.com/tabeahoehne132/django-qlab"
 Documentation = "https://github.com/tabeahoehne132/django-qlab#readme"
