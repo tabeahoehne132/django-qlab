@@ -7,6 +7,6 @@ __pycache__/
 
 frontend/node_modules/
 frontend/dist/
-.local-demo/
+
 
 qlab/static/qlab/index.html
