@@ -1,6 +1,6 @@
 import React from 'react'
 import { ModelEntry } from '../components/ContentSidebar'
-import { QueryRequest, SavedQuery } from '../lib/api'
+import { SavedQuery } from '../lib/api'
 import './WorkspacePages.css'
 
 interface ModelField {
@@ -96,14 +96,7 @@ interface DocsPageProps {
 interface SavedQueriesPageProps {
   savedQueries: SavedQuery[]
   activeSavedQueryId: number | null
-  currentDraft: QueryRequest | null
   onSelectSavedQuery: (id: number) => void
-  onCreateFromDraft: (input: {
-    name: string
-    description: string
-    tags: string[]
-    isShared: boolean
-  }) => Promise<void>
   onUpdateSavedQuery: (id: number, payload: Partial<SavedQuery>) => Promise<void>
   onDeleteSavedQuery: (id: number) => Promise<void>
   onOpenInBuilder: (query: SavedQuery) => void
@@ -141,7 +134,7 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({
   }
 
   return (
-    <div className="tab-panel active workspace-page">
+    <div className="tab-panel active workspace-page saved-queries-page">
       <div className="animate-in">
         <div className="page-title-row">
           <h1 className="page-title">MO<span>dels</span></h1>
@@ -277,7 +270,7 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ historyItems, onReplay
           <div className="history-filters">
             <button className={`hfilter-chip${filter === 'all' ? ' active' : ''}`} onClick={() => setFilter('all')}>All</button>
             <button className={`hfilter-chip${filter === 'errors' ? ' active' : ''}`} onClick={() => setFilter('errors')}>Errors</button>
-            <button className={`hfilter-chip${filter === 'saved' ? ' active' : ''}`} onClick={() => setFilter('saved')}>Saved Views</button>
+            <button className={`hfilter-chip${filter === 'saved' ? ' active' : ''}`} onClick={() => setFilter('saved')}>Saved Query Runs</button>
           </div>
           <input className="history-search" placeholder="Search history" value={search} onChange={(event) => setSearch(event.target.value)} />
         </div>
@@ -328,8 +321,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ sections, activeSett
         <div className="page-subtitle">configure · restrict · tune</div>
       </div>
 
-      <div className="workspace-stack animate-in">
-        <div className="card">
+      <div className="workspace-stack animate-in saved-queries-stack">
+        <div className="card saved-queries-card">
           <div className="card-header">
             <span className="card-title">{section.title}</span>
           </div>
@@ -420,38 +413,25 @@ export const DocsPage: React.FC<DocsPageProps> = ({ docs, activeDocKey }) => {
 export const SavedQueriesPage: React.FC<SavedQueriesPageProps> = ({
   savedQueries,
   activeSavedQueryId,
-  currentDraft,
   onSelectSavedQuery,
-  onCreateFromDraft,
   onUpdateSavedQuery,
   onDeleteSavedQuery,
   onOpenInBuilder,
   onRunSavedQuery,
 }) => {
   const activeQuery = savedQueries.find((item) => item.id === activeSavedQueryId) ?? savedQueries[0] ?? null
-  const [draftName, setDraftName] = React.useState('')
-  const [draftDescription, setDraftDescription] = React.useState('')
-  const [draftTags, setDraftTags] = React.useState('')
-  const [draftShared, setDraftShared] = React.useState(false)
-  const [saveState, setSaveState] = React.useState<'idle' | 'saving' | 'saved'>('idle')
   const [activeName, setActiveName] = React.useState(activeQuery?.name || '')
   const [activeDescription, setActiveDescription] = React.useState(activeQuery?.description || '')
-  const [activeTags, setActiveTags] = React.useState((activeQuery?.tags || []).join(', '))
-  const [activeShared, setActiveShared] = React.useState(Boolean(activeQuery?.is_shared))
   const [selectedIds, setSelectedIds] = React.useState<number[]>([])
 
   React.useEffect(() => {
     setActiveName(activeQuery?.name || '')
     setActiveDescription(activeQuery?.description || '')
-    setActiveTags((activeQuery?.tags || []).join(', '))
-    setActiveShared(Boolean(activeQuery?.is_shared))
   }, [activeQuery])
 
   React.useEffect(() => {
     setSelectedIds((current) => current.filter((id) => savedQueries.some((item) => item.id === id)))
   }, [savedQueries.length])
-
-  const hasDraft = Boolean(currentDraft?.model)
 
   return (
     <div className="tab-panel active workspace-page">
@@ -463,56 +443,6 @@ export const SavedQueriesPage: React.FC<SavedQueriesPageProps> = ({
       </div>
 
       <div className="workspace-stack animate-in">
-        <div className="card">
-          <div className="card-header">
-            <span className="card-title">Create <span className="card-title-accent">Saved Query</span></span>
-          </div>
-          <div className="card-body saved-query-editor">
-            <div className="saved-query-meta">
-              <div className="setting-row">
-                <div className="setting-info">
-                  <div className="setting-label">Current builder draft</div>
-                  <div className="setting-desc">
-                    {hasDraft ? `${currentDraft?.model} · ${(currentDraft?.select_fields || []).length} selected fields` : 'No query builder state available yet.'}
-                  </div>
-                </div>
-              </div>
-              <div className="saved-query-form-grid">
-                <input className="setting-input" placeholder="Name" value={draftName} onChange={(event) => setDraftName(event.target.value)} />
-                <input className="setting-input" placeholder="Tags: network, core" value={draftTags} onChange={(event) => setDraftTags(event.target.value)} />
-                <textarea className="setting-textarea" placeholder="Description" value={draftDescription} onChange={(event) => setDraftDescription(event.target.value)} />
-              </div>
-              <div className="saved-query-create-actions">
-                <label className="saved-query-shared">
-                  <input type="checkbox" checked={draftShared} onChange={(event) => setDraftShared(event.target.checked)} />
-                  Shared
-                </label>
-                <button
-                  className="btn btn-primary"
-                  disabled={!hasDraft || !draftName.trim() || saveState === 'saving'}
-                  onClick={async () => {
-                    setSaveState('saving')
-                    await onCreateFromDraft({
-                      name: draftName.trim(),
-                      description: draftDescription.trim(),
-                      tags: draftTags.split(',').map((item) => item.trim()).filter(Boolean),
-                      isShared: draftShared,
-                    })
-                    setDraftName('')
-                    setDraftDescription('')
-                    setDraftTags('')
-                    setDraftShared(false)
-                    setSaveState('saved')
-                    window.setTimeout(() => setSaveState('idle'), 1400)
-                  }}
-                >
-                  {saveState === 'saving' ? 'Saving…' : saveState === 'saved' ? 'Saved' : 'Save Current Query'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
         <div className="card">
           <div className="card-header">
             <span className="card-title">Saved <span className="card-title-accent">Queries</span></span>
@@ -530,7 +460,7 @@ export const SavedQueriesPage: React.FC<SavedQueriesPageProps> = ({
               </div>
             )}
           </div>
-          <div className="card-body saved-query-layout">
+          <div className="card-body saved-queries-card-body saved-query-layout">
             <div className="saved-query-list">
               {savedQueries.length === 0 && <div className="empty-state">No saved queries yet.</div>}
               {savedQueries.map((query) => (
@@ -552,7 +482,7 @@ export const SavedQueriesPage: React.FC<SavedQueriesPageProps> = ({
                   />
                   <div className="saved-query-list-copy">
                     <span className="saved-query-list-name">{query.name}</span>
-                    <span className="saved-query-list-meta">{query.model_name} · {query.tags.join(', ') || 'untagged'}</span>
+                    <span className="saved-query-list-meta">{query.model_name} · {new Date(query.updated_at).toLocaleDateString()}</span>
                   </div>
                 </div>
               ))}
@@ -561,13 +491,17 @@ export const SavedQueriesPage: React.FC<SavedQueriesPageProps> = ({
             <div className="saved-query-detail">
               {activeQuery ? (
                 <>
+                  <div className="saved-query-detail-meta">
+                    <span className="saved-query-detail-model">Model: {activeQuery.model_name}</span>
+                  </div>
                   <div className="saved-query-form-grid">
-                    <input className="setting-input" value={activeName} onChange={(event) => setActiveName(event.target.value)} />
-                    <input className="setting-input" value={activeTags} onChange={(event) => setActiveTags(event.target.value)} />
-                    <textarea className="setting-textarea" value={activeDescription} onChange={(event) => setActiveDescription(event.target.value)} />
-                    <label className="saved-query-shared">
-                      <input type="checkbox" checked={activeShared} onChange={(event) => setActiveShared(event.target.checked)} />
-                      Shared
+                    <label className="saved-query-field">
+                      <span className="saved-query-field-label">Name</span>
+                      <input className="setting-input saved-query-input saved-query-input-left" value={activeName} onChange={(event) => setActiveName(event.target.value)} />
+                    </label>
+                    <label className="saved-query-field saved-query-field-full">
+                      <span className="saved-query-field-label">Description</span>
+                      <textarea className="setting-textarea" value={activeDescription} onChange={(event) => setActiveDescription(event.target.value)} />
                     </label>
                   </div>
                   <div className="saved-query-actions">
@@ -576,8 +510,6 @@ export const SavedQueriesPage: React.FC<SavedQueriesPageProps> = ({
                       onClick={() => void onUpdateSavedQuery(activeQuery.id, {
                         name: activeName.trim(),
                         description: activeDescription.trim(),
-                        tags: activeTags.split(',').map((item) => item.trim()).filter(Boolean),
-                        is_shared: activeShared,
                       })}
                     >
                       Update
@@ -588,7 +520,7 @@ export const SavedQueriesPage: React.FC<SavedQueriesPageProps> = ({
                   </div>
                   <div className="saved-query-payload">
                     <div className="docs-h2">Payload</div>
-                    <pre className="docs-code-block"><code>{JSON.stringify(activeQuery.query_payload, null, 2)}</code></pre>
+                    <pre className="docs-code-block saved-query-code-block"><code>{JSON.stringify(activeQuery.query_payload, null, 2)}</code></pre>
                   </div>
                 </>
               ) : (

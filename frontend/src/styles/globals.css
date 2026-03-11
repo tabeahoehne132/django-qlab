@@ -9,12 +9,12 @@
   --text:      #e2e8f0;
   --muted:     #64728b;
   --muted2:    #8795ab;
-  --accent:    #00d4aa;
-  --accent-dim:#00d4aa18;
-  --accent2:   #4a9eff;
+  --accent:    #4a9eff;
+  --accent-dim:#4a9eff18;
+  --accent2:   #8dc2ff;
   --warn:      #f59e0b;
   --danger:    #ef4444;
-  --success:   #22c55e;
+  --success:   #4a9eff;
   --nav-w:     52px;
   --code-bg:   #0d1116;
   --panel-tint: rgba(18, 27, 46, 0.55);
@@ -34,12 +34,12 @@
   --text:      #111827;
   --muted:     #9aa3b0;
   --muted2:    #6b7685;
-  --accent:    #00a887;
-  --accent-dim:#00a88712;
+  --accent:    #4a9eff;
+  --accent-dim:#4a9eff12;
   --accent2:   #2c7be5;
   --warn:      #d97706;
   --danger:    #dc2626;
-  --success:   #16a34a;
+  --success:   #4a9eff;
   --code-bg:   #f8fafc;
   --panel-tint: rgba(236, 241, 248, 0.98);
   --panel-tint-strong: rgba(248, 250, 253, 0.99);
@@ -101,7 +101,7 @@ body {
   transition: all 0.12s; display: inline-flex; align-items: center; gap: 5px;
   letter-spacing: 0.02em; white-space: nowrap;
 }
-.btn-primary { background: var(--accent); color: #071411; font-weight: 600; border-color: var(--accent); }
+.btn-primary { background: var(--accent); color: #07101f; font-weight: 600; border-color: var(--accent); }
 .btn-primary:hover { filter: brightness(1.1); }
 .btn-secondary { background: var(--surface2); color: var(--muted2); border-color: var(--border2); }
 .btn-secondary:hover { color: var(--text); border-color: var(--muted); }
@@ -117,7 +117,7 @@ body {
   letter-spacing: 0.06em; padding: 2px 7px; border-radius: 2px; text-transform: uppercase;
 }
 .badge::before { content: ''; width: 4px; height: 4px; border-radius: 50%; }
-.badge-active  { color: var(--success); background: rgba(34,197,94,0.08);  border: 1px solid rgba(34,197,94,0.2); }
+.badge-active  { color: var(--success); background: rgba(74,158,255,0.08);  border: 1px solid rgba(74,158,255,0.2); }
 .badge-active::before  { background: var(--success); }
 .badge-offline { color: var(--danger);  background: rgba(239,68,68,0.08);  border: 1px solid rgba(239,68,68,0.2); }
 .badge-offline::before { background: var(--danger); }

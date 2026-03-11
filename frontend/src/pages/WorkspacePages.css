@@ -9,6 +9,28 @@
   gap: 12px;
 }
 
+.saved-queries-page {
+  overflow: hidden;
+  min-height: 0;
+}
+
+.saved-queries-stack {
+  flex: 1;
+  min-height: 0;
+}
+
+.saved-queries-card {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.saved-queries-card-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
 .model-card-head {
   display: flex;
   align-items: center;
@@ -65,7 +87,7 @@
 
 .model-tag.filterable {
   color: var(--accent);
-  border-color: rgba(0, 212, 170, 0.25);
+  border-color: rgba(74, 158, 255, 0.25);
   background: var(--accent-dim);
 }
 
@@ -189,7 +211,7 @@
   font-size: 0.65rem;
   font-weight: 600;
   color: var(--accent);
-  border: 1px solid rgba(0, 212, 170, 0.3);
+  border: 1px solid rgba(74, 158, 255, 0.3);
   background: var(--accent-dim);
   border-radius: 3px;
   padding: 4px 10px;
@@ -199,7 +221,7 @@
 }
 
 .query-hint-btn:hover {
-  background: rgba(0, 212, 170, 0.2);
+  background: rgba(74, 158, 255, 0.2);
 }
 
 .history-toolbar {
@@ -238,7 +260,7 @@
 
 .hfilter-chip.active {
   color: var(--accent);
-  border-color: rgba(0, 212, 170, 0.3);
+  border-color: rgba(74, 158, 255, 0.3);
   background: var(--accent-dim);
 }
 
@@ -392,7 +414,7 @@
 
 .h-action-btn.replay {
   color: var(--accent);
-  border-color: rgba(0, 212, 170, 0.3);
+  border-color: rgba(74, 158, 255, 0.3);
   background: var(--accent-dim);
 }
 
@@ -537,7 +559,7 @@
   font-size: 0.65rem;
   padding: 3px 9px;
   border-radius: 3px;
-  border: 1px solid rgba(0, 212, 170, 0.3);
+  border: 1px solid rgba(74, 158, 255, 0.3);
   color: var(--accent);
   background: var(--accent-dim);
   display: flex;
@@ -621,9 +643,9 @@
 }
 
 .method-get {
-  background: rgba(34, 197, 94, 0.12);
+  background: rgba(74, 158, 255, 0.12);
   color: var(--success);
-  border: 1px solid rgba(34, 197, 94, 0.2);
+  border: 1px solid rgba(74, 158, 255, 0.2);
 }
 
 .method-post {
@@ -679,6 +701,13 @@
   display: grid;
   grid-template-columns: 240px minmax(0, 1fr);
   gap: 14px;
+  min-height: 0;
+  height: 100%;
+  align-items: stretch;
+}
+
+.saved-query-layout > * {
+  min-height: 0;
 }
 
 .saved-query-list {
@@ -687,6 +716,9 @@
   gap: 6px;
   border-right: 1px solid var(--border);
   padding-right: 14px;
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1;
 }
 
 .saved-query-list-item {
@@ -708,7 +740,7 @@
 }
 
 .saved-query-list-item.active {
-  border-color: rgba(0, 212, 170, 0.28);
+  border-color: rgba(74, 158, 255, 0.28);
   background: var(--accent-dim);
 }
 
@@ -730,11 +762,52 @@
   color: var(--muted);
 }
 
+.saved-query-detail-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.saved-query-detail-model {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--muted2);
+}
+
 .saved-query-form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
   border: none;
+}
+
+.saved-query-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.saved-query-field-full {
+  grid-column: 1 / -1;
+}
+
+.saved-query-field-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.58rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.saved-query-input {
+  width: 100%;
+}
+
+.saved-query-input-left {
+  text-align: left;
 }
 
 .saved-query-form-grid .setting-input,
@@ -760,15 +833,6 @@
   border-color: var(--accent);
 }
 
-.saved-query-shared {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 0.68rem;
-  color: var(--muted2);
-}
-
 .saved-query-create-actions {
   display: flex;
   align-items: center;
@@ -782,12 +846,32 @@
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  flex-shrink: 0;
 }
 
 .saved-query-payload {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  flex: 0 0 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.saved-query-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.saved-query-code-block {
+  min-height: 0;
+  max-height: min(42vh, 360px);
+  overflow: auto;
+  margin-bottom: 0;
 }
 
 .copy-hint {

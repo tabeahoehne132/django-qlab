@@ -56,9 +56,9 @@ const TOUR_STEPS: Array<{
   },
   {
     title: 'Save useful query states',
-    body: 'Move to Saved to persist the current builder state, reopen it later and reuse it across sessions.',
-    tab: 'saved',
-    selector: '.saved-query-layout',
+    body: 'Save useful query states directly from the builder, then manage and edit them later in the Saved tab.',
+    tab: 'queries',
+    selector: '.query-builder-card',
   },
   {
     title: 'Use History as your audit trail',
@@ -346,7 +346,6 @@ export default function App() {
   const [metadataByModel, setMetadataByModel] = useState<Record<string, MetadataResponse>>({})
   const [queryPreset, setQueryPreset] = useState<QueryRequest | null>(null)
   const [queryResultPreset, setQueryResultPreset] = useState<QueryResponse | null>(null)
-  const [currentQueryDraft, setCurrentQueryDraft] = useState<QueryRequest | null>(null)
   const [activeSavedQueryId, setActiveSavedQueryId] = useState<number | null>(null)
   const [favoriteModels, setFavoriteModels] = useState<string[]>([])
   const [recentModelNames, setRecentModelNames] = useState<string[]>([])
@@ -615,15 +614,27 @@ export default function App() {
   }
 
   const activeMetadata = activeModel ? metadataByModel[activeModel] : undefined
+  const buildBlockedLookupMatcher = (metadata: MetadataResponse) => {
+    const blockedRoots = metadata.fields
+      .filter((field) => field.type === 'reverse_relation' || field.type === 'manytomany')
+      .map((field) => field.name)
+
+    return (lookup: string) => blockedRoots.some((root) => lookup === root || lookup.startsWith(`${root}__`))
+  }
+
   const fieldOptions = activeMetadata
-    ? activeMetadata.fields
-        .filter((field) => !field.name.includes('__'))
-        .filter((field) => field.type !== 'reverse_relation')
-        .filter((field) => field.type !== 'manytomany')
-        .map((field) => field.name)
+    ? (() => {
+        const isBlockedLookup = buildBlockedLookupMatcher(activeMetadata)
+        return Array.from(
+          new Set([
+            ...activeMetadata.fields.map((field) => field.name),
+            ...activeMetadata.all_lookups,
+          ]),
+        ).filter((lookup) => !isBlockedLookup(lookup))
+      })()
     : []
 
-  const colors = ['#4a9eff', '#22c55e', '#f59e0b', '#00d4aa', '#ef4444', '#f97316']
+  const colors = ['#4a9eff', '#7cbcff', '#f59e0b', '#2c7be5', '#ef4444', '#f97316']
   const buildFieldNotes = (field: MetadataField) => {
     const notes: string[] = []
     if (field.primary_key) notes.push('Primary key')
@@ -637,7 +648,34 @@ export default function App() {
   const models: ModelDetail[] = bootstrapModels.map((model, index) => {
     const metadata = metadataByModel[model.model_name]
     const directFields = metadata
-      ? metadata.fields.filter((field) => !field.name.includes('__'))
+      ? (() => {
+          const isBlockedLookup = buildBlockedLookupMatcher(metadata)
+          const fieldMap = new Map(
+            metadata.fields
+              .filter((field) => !isBlockedLookup(field.name))
+              .map((field) => [field.name, field]),
+          )
+
+          for (const lookup of metadata.all_lookups) {
+            if (isBlockedLookup(lookup) || fieldMap.has(lookup)) {
+              continue
+            }
+
+            fieldMap.set(lookup, {
+              name: lookup,
+              type: 'lookup',
+              label: lookup,
+              required: false,
+              allowed_operations: ['is', 'is_not', 'icontains'],
+              related_model: null,
+              filter_name: lookup,
+              max_length: null,
+              choices: null,
+            })
+          }
+
+          return Array.from(fieldMap.values())
+        })()
       : []
     return {
       name: model.model_name,
@@ -883,7 +921,24 @@ export default function App() {
             resultsPreset={queryResultPreset}
             onPresetApplied={() => setQueryPreset(null)}
             onResultsPresetApplied={() => setQueryResultPreset(null)}
-            onQueryDraftChange={setCurrentQueryDraft}
+            onSaveQuery={async ({ name, description, payload }) => {
+              try {
+                const created = await createSavedQuery({
+                  name,
+                  description,
+                  app_label: activeModelEntry?.app_label || '',
+                  model_name: payload.model,
+                  query_payload: payload as unknown as Record<string, unknown>,
+                  tags: [],
+                  is_shared: false,
+                })
+                syncSavedQuery(created)
+                pushToast('success', `Saved query "${created.name}".`)
+              } catch (error) {
+                pushToast('error', error instanceof Error ? error.message : 'Could not save query.')
+                throw error
+              }
+            }}
             onRunQuery={async (payload) => {
               try {
                 const response = await runQuery(payload)
@@ -917,28 +972,7 @@ export default function App() {
           <SavedQueriesPage
             savedQueries={savedQueries}
             activeSavedQueryId={activeSavedQueryId}
-            currentDraft={currentQueryDraft}
             onSelectSavedQuery={setActiveSavedQueryId}
-            onCreateFromDraft={async ({ name, description, tags, isShared }) => {
-              if (!currentQueryDraft) {
-                return
-              }
-              try {
-                const created = await createSavedQuery({
-                  name,
-                  description,
-                  app_label: activeModelEntry?.app_label || '',
-                  model_name: currentQueryDraft.model,
-                  query_payload: currentQueryDraft as unknown as Record<string, unknown>,
-                  tags,
-                  is_shared: isShared,
-                })
-                syncSavedQuery(created)
-                pushToast('success', `Saved query "${created.name}".`)
-              } catch (error) {
-                pushToast('error', error instanceof Error ? error.message : 'Could not save query.')
-              }
-            }}
             onUpdateSavedQuery={async (id, payload) => {
               try {
                 const updated = await updateSavedQuery(id, payload)

@@ -372,12 +372,6 @@ const QueriesSidebarPanel: React.FC<QueriesSidebarPanelProps> = ({
         ))}
       </div>
     </div>
-    <div className="csidebar-footer">
-      <div className="info-box">
-        <strong>Tip</strong>
-        Favorite core models and keep the long tail grouped by app.
-      </div>
-    </div>
   </div>
 )
 

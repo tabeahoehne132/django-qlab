@@ -29,7 +29,7 @@
   user-select: none;
 }
 .nav-icon-btn:hover { color: var(--muted2); background: var(--surface2); }
-.nav-icon-btn.active { color: var(--accent); background: var(--accent-dim); border-color: rgba(0,212,170,0.18); }
+.nav-icon-btn.active { color: var(--accent); background: var(--accent-dim); border-color: rgba(74,158,255,0.18); }
 .nav-icon-btn svg { width: 16px; height: 16px; }
 
 .nav-icon-btn::after {

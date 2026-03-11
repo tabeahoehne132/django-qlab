@@ -1,5 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
+  Combobox,
+  ComboboxInput,
+  ComboboxOption,
+  ComboboxOptions,
+  Dialog,
+  DialogPanel,
+  DialogTitle,
+} from '@headlessui/react'
+import {
   QueryCondition,
   QueryFilterGroup,
   QueryRequest,
@@ -184,108 +193,43 @@ const ResourceRow: React.FC<ResourceRowProps> = ({ activeModel }) => (
 
 interface ConditionRowProps {
   node: FilterConditionNode
-  fields: string[]
   onChange: (id: string, patch: Partial<FilterConditionNode>) => void
   onRemove: (id: string) => void
+  onOpenFieldDialog: (id: string) => void
 }
 
-const FilterFieldPicker: React.FC<{
-  value: string
-  fields: string[]
-  onChange: (value: string) => void
-}> = ({ value, fields, onChange }) => {
-  const [isOpen, setIsOpen] = useState(false)
-  const [search, setSearch] = useState('')
-  const pickerRef = useRef<HTMLDivElement | null>(null)
-
-  useEffect(() => {
-    if (!isOpen) {
-      return
-    }
-
-    const handleOutsideClick = (event: MouseEvent) => {
-      if (!pickerRef.current?.contains(event.target as Node)) {
-        setIsOpen(false)
-      }
-    }
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setIsOpen(false)
-      }
-    }
-
-    document.addEventListener('mousedown', handleOutsideClick)
-    document.addEventListener('keydown', handleEscape)
-    return () => {
-      document.removeEventListener('mousedown', handleOutsideClick)
-      document.removeEventListener('keydown', handleEscape)
-    }
-  }, [isOpen])
-
-  const matchingFields = fields.filter((field) => (
-    field.toLowerCase().includes(search.trim().toLowerCase())
-  ))
-
-  return (
-    <div className="filter-field-picker" ref={pickerRef}>
-      <button
-        className="fsel fsel-trigger"
-        type="button"
-        onClick={() => setIsOpen((current) => !current)}
-      >
-        {value || 'Choose field'}
-      </button>
-      {isOpen && (
-        <div className="field-picker filter-field-menu">
-          <div className="field-picker-top">
-            <input
-              className="field-picker-input"
-              placeholder="Search field"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              autoFocus
-            />
-            <button
-              type="button"
-              className="field-picker-close"
-              onClick={() => setIsOpen(false)}
-              aria-label="Close field picker"
-            >
-              ×
-            </button>
-          </div>
-          <div className="field-picker-list">
-            {matchingFields.length === 0 && (
-              <div className="field-picker-empty">No matching fields.</div>
-            )}
-            {matchingFields.map((field) => (
-              <button
-                key={field}
-                type="button"
-                className="field-picker-item"
-                onClick={() => {
-                  onChange(field)
-                  setSearch('')
-                  setIsOpen(false)
-                }}
-              >
-                {field}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  )
+interface FieldPickerTriggerProps {
+  label: string
+  active?: boolean
+  disabled?: boolean
+  className?: string
+  onClick: () => void
 }
 
-const ConditionRow: React.FC<ConditionRowProps> = ({ node, fields, onChange, onRemove }) => (
+const FieldPickerTrigger: React.FC<FieldPickerTriggerProps> = ({
+  label,
+  active = false,
+  disabled = false,
+  className = '',
+  onClick,
+}) => (
+  <button
+    type="button"
+    className={`resource-chip field-picker-trigger${active ? ' active' : ' add'}${className ? ` ${className}` : ''}`}
+    disabled={disabled}
+    onClick={onClick}
+  >
+    {label}
+  </button>
+)
+
+const ConditionRow: React.FC<ConditionRowProps> = ({ node, onChange, onRemove, onOpenFieldDialog }) => (
   <div className="filter-row">
-    <FilterFieldPicker
-      value={node.field}
-      fields={fields}
-      onChange={(value) => onChange(node.id, { field: value })}
+    <FieldPickerTrigger
+      label={node.field || '+ Choose Field'}
+      active={Boolean(node.field)}
+      className="field-trigger"
+      onClick={() => onOpenFieldDialog(node.id)}
     />
 
     <select
@@ -323,6 +267,7 @@ interface FilterGroupEditorProps {
   onAddCondition: (groupId: string) => void
   onAddGroup: (groupId: string) => void
   onRemoveNode: (id: string) => void
+  onOpenFieldDialog: (id: string) => void
 }
 
 const FilterGroupEditor: React.FC<FilterGroupEditorProps> = ({
@@ -336,6 +281,7 @@ const FilterGroupEditor: React.FC<FilterGroupEditorProps> = ({
   onAddCondition,
   onAddGroup,
   onRemoveNode,
+  onOpenFieldDialog,
 }) => (
   <div className={`filter-group depth-${depth}`}>
     <div className="filter-group-head">
@@ -377,14 +323,15 @@ const FilterGroupEditor: React.FC<FilterGroupEditorProps> = ({
             onAddCondition={onAddCondition}
             onAddGroup={onAddGroup}
             onRemoveNode={onRemoveNode}
+            onOpenFieldDialog={onOpenFieldDialog}
           />
         ) : (
           <ConditionRow
             key={child.id}
             node={child}
-            fields={fields}
             onChange={onUpdateCondition}
             onRemove={onRemoveNode}
+            onOpenFieldDialog={onOpenFieldDialog}
           />
         )
       ))}
@@ -466,9 +413,18 @@ interface QueriesPageProps {
   resultsPreset?: QueryResponse | null
   onPresetApplied?: () => void
   onResultsPresetApplied?: () => void
-  onQueryDraftChange?: (payload: QueryRequest) => void
+  onSaveQuery?: (input: {
+    name: string
+    description: string
+    payload: QueryRequest
+  }) => Promise<void>
   onRunQuery: (payload: QueryRequest) => Promise<QueryResponse>
 }
+
+type FieldDialogState =
+  | { type: 'select' }
+  | { type: 'filter'; conditionId: string }
+  | null
 
 export const QueriesPage: React.FC<QueriesPageProps> = ({
   activeModel,
@@ -480,7 +436,7 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
   resultsPreset,
   onPresetApplied,
   onResultsPresetApplied,
-  onQueryDraftChange,
+  onSaveQuery,
   onRunQuery,
 }) => {
   const fallbackField = fieldOptions[0] || 'id'
@@ -499,16 +455,19 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
   const [results, setResults] = useState<QueryResponse | null>(null)
   const [selectedFields, setSelectedFields] = useState<string[]>([])
   const [fieldSearch, setFieldSearch] = useState('')
-  const [isFieldPickerOpen, setIsFieldPickerOpen] = useState(false)
+  const [fieldDialog, setFieldDialog] = useState<FieldDialogState>(null)
   const [copyState, setCopyState] = useState<'idle' | 'done' | 'error'>('idle')
   const [csvState, setCsvState] = useState<'idle' | 'done'>('idle')
-  const fieldPickerRef = useRef<HTMLDivElement | null>(null)
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false)
+  const [saveName, setSaveName] = useState('')
+  const [saveDescription, setSaveDescription] = useState('')
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle')
 
   useEffect(() => {
     if (!fieldOptions.length) {
       setFilters(newGroup('', 'and'))
       setSelectedFields([])
-      setIsFieldPickerOpen(false)
+      setFieldDialog(null)
       return
     }
 
@@ -566,29 +525,27 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
   }, [defaultPageSize, fallbackField, onPresetApplied, onResultsPresetApplied, queryPreset, resultsPreset])
 
   useEffect(() => {
-    if (!isFieldPickerOpen) {
+    if (!fieldDialog) {
       return
-    }
-
-    const handleOutsideClick = (event: MouseEvent) => {
-      if (!fieldPickerRef.current?.contains(event.target as Node)) {
-        setIsFieldPickerOpen(false)
-      }
     }
 
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        setIsFieldPickerOpen(false)
+        setFieldDialog(null)
       }
     }
 
-    document.addEventListener('mousedown', handleOutsideClick)
     document.addEventListener('keydown', handleEscape)
     return () => {
-      document.removeEventListener('mousedown', handleOutsideClick)
       document.removeEventListener('keydown', handleEscape)
     }
-  }, [isFieldPickerOpen])
+  }, [fieldDialog])
+
+  useEffect(() => {
+    if (!fieldDialog) {
+      setFieldSearch('')
+    }
+  }, [fieldDialog])
 
   const updateNode = (
     node: FilterNode,
@@ -688,7 +645,8 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
   }
 
   const availableFields = fieldOptions.filter((field) => !selectedFields.includes(field))
-  const matchingFields = availableFields.filter((field) => (
+  const fieldDialogOptions = fieldDialog?.type === 'select' ? availableFields : fieldOptions
+  const matchingFields = fieldDialogOptions.filter((field) => (
     field.toLowerCase().includes(fieldSearch.trim().toLowerCase())
   ))
   const hasIncompleteFilters = useMemo(() => {
@@ -723,20 +681,17 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
     }
   }
 
-  useEffect(() => {
-    if (!activeModel || selectedFields.length === 0) {
-      return
-    }
-    onQueryDraftChange?.(buildPayload(1))
-  }, [
-    activeAppLabel,
-    activeModel,
-    defaultPageSize,
-    filters,
-    limit,
-    onQueryDraftChange,
-    selectedFields,
-  ])
+  const openSaveDialog = () => {
+    setSaveName(`${activeModel} query`)
+    setSaveDescription('')
+    setSaveState('idle')
+    setSaveDialogOpen(true)
+  }
+
+  const closeSaveDialog = () => {
+    setSaveDialogOpen(false)
+    setSaveState('idle')
+  }
 
   const handleRunQuery = async ({
     page = 1,
@@ -817,6 +772,8 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
   }
 
   const rows = (results?.results || []) as ResultRow[]
+  const fieldDialogTitle = fieldDialog?.type === 'filter' ? 'Choose filter field' : 'Add field'
+  const fieldDialogModelLabel = fieldDialog?.type === 'filter' ? `${activeModel} rule` : activeModel
   const sortedResults = [...rows].sort((left, right) => {
     const leftValue = left[sortField] ?? ''
     const rightValue = right[sortField] ?? ''
@@ -827,7 +784,7 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
   })
 
   return (
-    <div className="tab-panel active">
+    <div className="tab-panel active queries-page">
       <div className="animate-in">
         <div className="page-title-row">
           <h1 className="page-title">Q<span>Lab</span></h1>
@@ -842,7 +799,7 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
         <div className="card-body">
           <ResourceRow activeModel={activeModel} />
 
-          <div className={`field-selector${isFieldPickerOpen ? ' open' : ''}`}>
+          <div className="field-selector">
             <span className="from-label">SELECT</span>
             {metadataLoading && <span className="field-hint">Loading fields…</span>}
             {!metadataLoading && fieldOptions.length === 0 && <span className="field-hint">No fields available.</span>}
@@ -857,55 +814,13 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
               </button>
             ))}
             {!metadataLoading && fieldOptions.length > 0 && (
-              <div className="field-picker-wrap" ref={fieldPickerRef}>
-                <button
-                  type="button"
-                  className="resource-chip add"
+              <div className="field-picker-wrap">
+                <FieldPickerTrigger
+                  label={availableFields.length === 0 ? 'All Fields Added' : '+ Add Field'}
                   disabled={availableFields.length === 0}
-                  onClick={() => setIsFieldPickerOpen((current) => !current)}
-                >
-                  {availableFields.length === 0 ? 'All Fields Added' : '+ Add Field'}
-                </button>
-                {isFieldPickerOpen && (
-                  <div className="field-picker">
-                    <div className="field-picker-top">
-                      <input
-                        className="field-picker-input"
-                        placeholder="Search field"
-                        value={fieldSearch}
-                        onChange={(event) => setFieldSearch(event.target.value)}
-                        autoFocus
-                      />
-                      <button
-                        type="button"
-                        className="field-picker-close"
-                        onClick={() => setIsFieldPickerOpen(false)}
-                        aria-label="Close field picker"
-                      >
-                        ×
-                      </button>
-                    </div>
-                    <div className="field-picker-list">
-                      {matchingFields.length === 0 && (
-                        <div className="field-picker-empty">No matching fields.</div>
-                      )}
-                      {matchingFields.map((field) => (
-                        <button
-                          key={field}
-                          type="button"
-                          className="field-picker-item"
-                          onClick={() => {
-                            toggleField(field)
-                            setFieldSearch('')
-                            setIsFieldPickerOpen(false)
-                          }}
-                        >
-                          {field}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                  className="field-selector-trigger"
+                  onClick={() => setFieldDialog((current) => current?.type === 'select' ? null : { type: 'select' })}
+                />
               </div>
             )}
           </div>
@@ -921,6 +836,7 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
               onAddCondition={handleAddConditionToGroup}
               onAddGroup={handleAddGroupToGroup}
               onRemoveNode={handleRemoveFilterNode}
+              onOpenFieldDialog={(conditionId) => setFieldDialog({ type: 'filter', conditionId })}
             />
           </div>
 
@@ -940,6 +856,15 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
             >
               <IconPlus /> Add Rule
             </button>
+            {onSaveQuery && (
+              <button
+                className="btn btn-secondary"
+                onClick={openSaveDialog}
+                disabled={metadataLoading || fieldOptions.length === 0 || selectedFields.length === 0}
+              >
+                Save Query
+              </button>
+            )}
             {filters.children.length > 0 && (
               <button className="btn btn-ghost" onClick={() => setFilters(newGroup(fallbackField, 'and'))}>
                 Clear
@@ -962,8 +887,148 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
         </div>
       </div>
 
+      <Dialog open={Boolean(fieldDialog)} onClose={() => setFieldDialog(null)} className="field-picker-overlay">
+        <div className="field-picker-backdrop" aria-hidden="true" />
+        <div className="field-picker-overlay-shell">
+          <DialogPanel className="field-picker-modal">
+            <div className="field-picker-modal-head">
+              <div>
+                <div className="field-picker-modal-kicker">{fieldDialogTitle}</div>
+                <DialogTitle className="field-picker-modal-title">{fieldDialogModelLabel}</DialogTitle>
+              </div>
+              <button
+                type="button"
+                className="field-picker-close"
+                onMouseDown={(event) => {
+                  event.preventDefault()
+                  event.stopPropagation()
+                  setFieldDialog(null)
+                }}
+                aria-label="Close field picker"
+              >
+                ×
+              </button>
+            </div>
+            <Combobox
+              value={fieldSearch}
+              onChange={(field: string | null) => {
+                if (!field) {
+                  return
+                }
+                if (fieldDialog?.type === 'filter') {
+                  handleConditionChange(fieldDialog.conditionId, { field })
+                } else {
+                  toggleField(field)
+                }
+                setFieldDialog(null)
+              }}
+              onClose={() => setFieldSearch('')}
+              immediate
+            >
+              <ComboboxInput
+                className="field-picker-input"
+                displayValue={() => fieldSearch}
+                placeholder="Search field"
+                onChange={(event) => setFieldSearch(event.target.value)}
+                autoFocus
+              />
+              <ComboboxOptions className="field-picker-list field-picker-list-modal combobox-options-modal">
+                {matchingFields.length === 0 && (
+                  <div className="field-picker-empty">No matching fields.</div>
+                )}
+                {matchingFields.map((field) => (
+                  <ComboboxOption
+                    key={field}
+                    value={field}
+                    className="field-picker-item"
+                  >
+                    {field}
+                  </ComboboxOption>
+                ))}
+              </ComboboxOptions>
+            </Combobox>
+          </DialogPanel>
+        </div>
+      </Dialog>
+
+      <Dialog open={saveDialogOpen} onClose={closeSaveDialog} className="field-picker-overlay">
+        <div className="field-picker-backdrop" aria-hidden="true" />
+        <div className="field-picker-overlay-shell">
+          <DialogPanel className="field-picker-modal save-query-modal">
+            <div className="field-picker-modal-head">
+              <div>
+                <div className="field-picker-modal-kicker">Save query</div>
+                <DialogTitle className="field-picker-modal-title">{activeModel}</DialogTitle>
+              </div>
+              <button
+                type="button"
+                className="field-picker-close"
+                onMouseDown={(event) => {
+                  event.preventDefault()
+                  event.stopPropagation()
+                  closeSaveDialog()
+                }}
+                aria-label="Close save query dialog"
+              >
+                ×
+              </button>
+            </div>
+            <div className="save-query-summary">
+              {selectedFields.length} fields selected
+            </div>
+            <div className="save-query-dialog-grid">
+              <input
+                className="save-query-input"
+                placeholder="Name"
+                value={saveName}
+                onChange={(event) => setSaveName(event.target.value)}
+              />
+              <textarea
+                className="save-query-textarea"
+                placeholder="Description"
+                value={saveDescription}
+                onChange={(event) => setSaveDescription(event.target.value)}
+              />
+            </div>
+            <div className="save-query-actions">
+              <div className="save-query-actions-right">
+                <button className="btn btn-ghost" type="button" onClick={closeSaveDialog}>
+                  Cancel
+                </button>
+                <button
+                  className="btn btn-primary"
+                  type="button"
+                  disabled={!saveName.trim() || saveState === 'saving'}
+                  onClick={async () => {
+                    if (!onSaveQuery) {
+                      return
+                    }
+                    setSaveState('saving')
+                    try {
+                      await onSaveQuery({
+                        name: saveName.trim(),
+                        description: saveDescription.trim(),
+                        payload: buildPayload(1),
+                      })
+                      setSaveState('saved')
+                      window.setTimeout(() => {
+                        closeSaveDialog()
+                      }, 300)
+                    } catch {
+                      setSaveState('idle')
+                    }
+                  }}
+                >
+                  {saveState === 'saving' ? 'Saving…' : saveState === 'saved' ? 'Saved' : 'Save Query'}
+                </button>
+              </div>
+            </div>
+          </DialogPanel>
+        </div>
+      </Dialog>
+
       {results && (
-        <div className="card animate-in" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div className="card animate-in query-results-card" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <div className="results-meta">
             <span className="result-count">{results.count}</span>
             <span className="result-count-label">results</span>

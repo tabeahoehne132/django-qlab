@@ -26,6 +26,8 @@ Query builder:
 
 ## Install
 
+Normal package consumers do not need `vite`, `npm run dev`, or a frontend build. The published Python package already ships the compiled UI assets.
+
 ```bash
 pip install git+https://github.com/tabeahoehne132/django-qlab.git
 ```
@@ -50,6 +52,26 @@ urlpatterns = [
     path("qlab/", include("qlab.urls")),
 ]
 ```
+
+Collect static files if your project requires it:
+
+```bash
+python manage.py collectstatic
+```
+
+Then open `/qlab/` in your Django project.
+
+## Consumer flow
+
+For users of the package, the setup is only:
+
+1. `pip install django-qlab`
+2. add `qlab` to `INSTALLED_APPS`
+3. include `qlab.urls`
+4. run `collectstatic`
+5. open `/qlab/`
+
+No separate frontend server is required.
 
 ## API surface
 
@@ -83,18 +105,41 @@ Built-in routes exposed by `qlab.urls`:
 
 ## Local frontend development
 
+This section is only for maintainers working on the packaged UI itself.
+
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-To rebuild the bundled assets:
+To rebuild the bundled assets into `qlab/static/qlab/`:
 
 ```bash
 cd frontend
 npm run build
 ```
+
+Or use the helper script from the repo root:
+
+```bash
+./scripts/build_package_ui.sh
+```
+
+## Maintainer release flow
+
+Before publishing a new package version:
+
+1. rebuild the packaged UI assets
+2. verify the generated files in `qlab/static/qlab/`
+3. build the Python distribution
+
+```bash
+./scripts/build_package_ui.sh
+python -m build
+```
+
+The frontend build is done by the package maintainer, not by package consumers.
 
 ## Local demo project
 

@@ -81,8 +81,8 @@ const IconTheme = ({ theme }: { theme: ThemeMode }) => (
 const Logo = () => (
   <svg viewBox="0 0 30 30" fill="none" width="30" height="30">
     <rect width="30" height="30" rx="6" fill="#1a1e26"/>
-    <path d="M8 15h14M15 8v14" stroke="#00d4aa" strokeWidth="1.8" strokeLinecap="round"/>
-    <circle cx="15" cy="15" r="3.5" stroke="#00d4aa" strokeWidth="1.5"/>
+    <path d="M8 15h14M15 8v14" stroke="#4a9eff" strokeWidth="1.8" strokeLinecap="round"/>
+    <circle cx="15" cy="15" r="3.5" stroke="#4a9eff" strokeWidth="1.5"/>
     <circle cx="8"  cy="8"  r="1.5" fill="#4a9eff"/>
     <circle cx="22" cy="8"  r="1.5" fill="#4a9eff"/>
     <circle cx="8"  cy="22" r="1.5" fill="#4a9eff"/>
