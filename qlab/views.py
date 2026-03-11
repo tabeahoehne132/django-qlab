@@ -1,5 +1,4 @@
 from django.conf import settings
-from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
 from django.utils.decorators import method_decorator
@@ -8,7 +7,7 @@ from django.views import View
 
 
 @method_decorator(ensure_csrf_cookie, name="dispatch")
-class QLabView(LoginRequiredMixin, View):
+class QLabView(View):
     """
     Serves the QLab frontend UI.
 

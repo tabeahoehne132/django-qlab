@@ -77,38 +77,6 @@ const SETTINGS_SECTIONS: SettingsGroup[] = [
       { label: 'Environment badge', description: 'Visible environment marker shown in the left sidebar.', control: <select className="setting-select" defaultValue="Local"><option>Local</option><option>Staging</option><option>Prod</option></select> },
     ],
   },
-  {
-    key: 'permissions',
-    title: 'Permissions',
-    items: [
-      { label: 'Require authentication', description: 'Delegate access control to the host project before queries execute.', control: <SettingsToggle checked /> },
-      { label: 'Expose restricted models', description: 'Keep disabled for internal-only models or sensitive endpoints.', control: <SettingsToggle /> },
-    ],
-  },
-  {
-    key: 'scopes',
-    title: 'Scopes',
-    items: [
-      { label: 'Allowed apps', description: 'Limit the metadata browser to approved Django apps.', control: <div className="scope-tag-list"><span className="scope-tag">core <span className="scope-tag-remove">×</span></span><span className="scope-tag">network <span className="scope-tag-remove">×</span></span></div> },
-      { label: 'Max relation depth', description: 'Avoid overly expensive nested relation traversals.', control: <input className="setting-input" defaultValue="2" /> },
-    ],
-  },
-  {
-    key: 'rate-limits',
-    title: 'Rate Limits',
-    items: [
-      { label: 'Throttle query runs', description: 'Protect shared environments from accidental bursts.', control: <SettingsToggle checked /> },
-      { label: 'Requests per minute', description: 'Upper bound for interactive usage from the UI shell.', control: <input className="setting-input" defaultValue="60" /> },
-    ],
-  },
-  {
-    key: 'advanced',
-    title: 'Advanced',
-    items: [
-      { label: 'Metadata cache', description: 'Reuse schema responses to speed up the builder experience.', control: <SettingsToggle checked /> },
-      { label: 'Response mode', description: 'Switch how much payload detail the frontend should request.', control: <select className="setting-select" defaultValue="Full"><option>Full</option><option>Compact</option></select> },
-    ],
-  },
 ]
 
 const SETTINGS_NAV_ITEMS: DocsNavItem[] = SETTINGS_SECTIONS.map((section) => ({
@@ -791,21 +759,16 @@ export default function App() {
         },
         {
           label: 'Default page size',
-          description: 'Initial result size used by the query builder.',
-          control: (
-            <input
-              className="setting-input"
-              type="number"
-              min={1}
-              max={500}
-              value={defaultPageSize}
-              onChange={(event) => setDefaultPageSize(Number(event.target.value))}
-            />
-          ),
+          description: 'Managed by the host application.',
+          control: <span className="setting-readonly">{defaultPageSize}</span>,
+        },
+        {
+          label: 'Environment badge',
+          description: 'Managed by the host application.',
+          control: <span className="setting-readonly">Local</span>,
         },
       ],
     },
-    ...SETTINGS_SECTIONS.slice(1),
   ]
 
   if (isBootstrapping) {
@@ -823,8 +786,6 @@ export default function App() {
         onTabChange={setActiveTab}
         theme={theme}
         onThemeToggle={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')}
-        projectName="QLAB"
-        userInitials="TH"
       />
 
       <ContentSidebar

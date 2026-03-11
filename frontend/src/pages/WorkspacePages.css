@@ -9,6 +9,25 @@
   gap: 12px;
 }
 
+.models-page {
+  overflow: hidden;
+  min-height: 0;
+}
+
+.models-stack {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.models-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .saved-queries-page {
   overflow: hidden;
   min-height: 0;
@@ -168,6 +187,7 @@
 
 .relation-card {
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .relation-row {
@@ -430,6 +450,7 @@
   display: flex;
   flex-direction: column;
   gap: 0;
+  overflow-y: auto;
 }
 
 .settings-section-title,
@@ -546,6 +567,20 @@
 .setting-select {
   appearance: none;
   cursor: pointer;
+}
+
+.setting-readonly {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 100px;
+  padding: 6px 10px;
+  border: 1px solid var(--border2);
+  border-radius: 3px;
+  background: rgba(18, 25, 39, 0.55);
+  color: var(--muted2);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.72rem;
 }
 
 .scope-tag-list {

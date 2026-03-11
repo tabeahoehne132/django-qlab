@@ -1,9 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Combobox,
-  ComboboxInput,
-  ComboboxOption,
-  ComboboxOptions,
   Dialog,
   DialogPanel,
   DialogTitle,
@@ -463,11 +459,16 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
   const [saveDescription, setSaveDescription] = useState('')
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle')
 
+  const closeFieldDialog = () => {
+    setFieldSearch('')
+    setFieldDialog(null)
+  }
+
   useEffect(() => {
     if (!fieldOptions.length) {
       setFilters(newGroup('', 'and'))
       setSelectedFields([])
-      setFieldDialog(null)
+      closeFieldDialog()
       return
     }
 
@@ -531,7 +532,7 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
 
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        setFieldDialog(null)
+        closeFieldDialog()
       }
     }
 
@@ -887,7 +888,7 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
         </div>
       </div>
 
-      <Dialog open={Boolean(fieldDialog)} onClose={() => setFieldDialog(null)} className="field-picker-overlay">
+      <Dialog open={Boolean(fieldDialog)} onClose={closeFieldDialog} className="field-picker-overlay">
         <div className="field-picker-backdrop" aria-hidden="true" />
         <div className="field-picker-overlay-shell">
           <DialogPanel className="field-picker-modal">
@@ -899,54 +900,49 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
               <button
                 type="button"
                 className="field-picker-close"
-                onMouseDown={(event) => {
+                onPointerDown={(event) => {
                   event.preventDefault()
                   event.stopPropagation()
-                  setFieldDialog(null)
+                  closeFieldDialog()
+                }}
+                onClick={(event) => {
+                  event.preventDefault()
+                  event.stopPropagation()
                 }}
                 aria-label="Close field picker"
               >
                 ×
               </button>
             </div>
-            <Combobox
+            <input
+              className="field-picker-input"
               value={fieldSearch}
-              onChange={(field: string | null) => {
-                if (!field) {
-                  return
-                }
-                if (fieldDialog?.type === 'filter') {
-                  handleConditionChange(fieldDialog.conditionId, { field })
-                } else {
-                  toggleField(field)
-                }
-                setFieldDialog(null)
-              }}
-              onClose={() => setFieldSearch('')}
-              immediate
-            >
-              <ComboboxInput
-                className="field-picker-input"
-                displayValue={() => fieldSearch}
-                placeholder="Search field"
-                onChange={(event) => setFieldSearch(event.target.value)}
-                autoFocus
-              />
-              <ComboboxOptions className="field-picker-list field-picker-list-modal combobox-options-modal">
-                {matchingFields.length === 0 && (
-                  <div className="field-picker-empty">No matching fields.</div>
-                )}
-                {matchingFields.map((field) => (
-                  <ComboboxOption
-                    key={field}
-                    value={field}
-                    className="field-picker-item"
-                  >
-                    {field}
-                  </ComboboxOption>
-                ))}
-              </ComboboxOptions>
-            </Combobox>
+              placeholder="Search field"
+              onChange={(event) => setFieldSearch(event.target.value)}
+              autoFocus
+            />
+            <div className="field-picker-list field-picker-list-modal">
+              {matchingFields.length === 0 && (
+                <div className="field-picker-empty">No matching fields.</div>
+              )}
+              {matchingFields.map((field) => (
+                <button
+                  key={field}
+                  type="button"
+                  className="field-picker-item"
+                  onClick={() => {
+                    if (fieldDialog?.type === 'filter') {
+                      handleConditionChange(fieldDialog.conditionId, { field })
+                    } else {
+                      toggleField(field)
+                    }
+                    closeFieldDialog()
+                  }}
+                >
+                  {field}
+                </button>
+              ))}
+            </div>
           </DialogPanel>
         </div>
       </Dialog>
@@ -963,10 +959,14 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
               <button
                 type="button"
                 className="field-picker-close"
-                onMouseDown={(event) => {
+                onPointerDown={(event) => {
                   event.preventDefault()
                   event.stopPropagation()
                   closeSaveDialog()
+                }}
+                onClick={(event) => {
+                  event.preventDefault()
+                  event.stopPropagation()
                 }}
                 aria-label="Close save query dialog"
               >

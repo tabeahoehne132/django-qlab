@@ -49,25 +49,16 @@
 
 .nav-divider { width: 20px; height: 1px; background: var(--border); margin: 6px 0; }
 
-.nav-bottom { display: flex; flex-direction: column; align-items: center; gap: 8px; }
-
-.nav-theme-btn {
-  width: 28px;
-  height: 28px;
-  border-radius: 999px;
-  border: 1px solid var(--border2);
-  background: var(--surface2);
-  color: var(--muted2);
+.nav-bottom {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.15s;
+  gap: 0;
+  padding-top: 6px;
 }
 
-.nav-theme-btn:hover {
-  color: var(--text);
-  border-color: var(--accent2);
+.nav-theme-btn {
+  margin-top: auto;
 }
 
 .nav-theme-btn svg {
@@ -75,17 +66,17 @@
   height: 14px;
 }
 
-.nav-status {
-  width: 7px; height: 7px; border-radius: 50%;
-  background: var(--success); box-shadow: 0 0 6px var(--success);
+:root[data-theme="dark"] .nav-theme-btn {
+  color: var(--accent2);
+  background: rgba(74, 158, 255, 0.14);
+  border-color: rgba(74, 158, 255, 0.28);
+  box-shadow: inset 0 0 0 1px rgba(74, 158, 255, 0.08);
 }
 
-.nav-avatar {
-  width: 28px; height: 28px; border-radius: 50%;
-  background: var(--accent-dim); border: 1px solid var(--accent);
-  display: flex; align-items: center; justify-content: center;
-  font-family: 'IBM Plex Mono', monospace; font-size: 0.6rem; font-weight: 600;
-  color: var(--accent); cursor: pointer; letter-spacing: 0.04em;
+:root[data-theme="dark"] .nav-theme-btn:hover {
+  color: var(--text);
+  background: rgba(74, 158, 255, 0.2);
+  border-color: rgba(141, 194, 255, 0.42);
 }
 
 @media (max-width: 920px) {

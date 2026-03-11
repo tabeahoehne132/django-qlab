@@ -9,8 +9,6 @@ interface NavSidebarProps {
   onTabChange: (tab: TabId) => void
   theme: ThemeMode
   onThemeToggle: () => void
-  projectName?: string
-  userInitials?: string
 }
 
 const IconSearch = () => (
@@ -108,8 +106,6 @@ export const NavSidebar: React.FC<NavSidebarProps> = ({
   onTabChange,
   theme,
   onThemeToggle,
-  projectName = 'QLAB',
-  userInitials = '??',
 }) => {
   return (
     <nav className="nav-sidebar">
@@ -129,14 +125,13 @@ export const NavSidebar: React.FC<NavSidebarProps> = ({
 
       <div className="nav-bottom">
         <button
-          className="nav-theme-btn"
+          className="nav-icon-btn nav-theme-btn"
           onClick={onThemeToggle}
           title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          data-tip={theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
         >
           <IconTheme theme={theme} />
         </button>
-        <div className="nav-status" title={projectName} />
-        <div className="nav-avatar" title={projectName}>{userInitials}</div>
       </div>
     </nav>
   )

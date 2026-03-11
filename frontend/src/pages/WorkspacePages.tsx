@@ -134,7 +134,7 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({
   }
 
   return (
-    <div className="tab-panel active workspace-page saved-queries-page">
+    <div className="tab-panel active workspace-page models-page">
       <div className="animate-in">
         <div className="page-title-row">
           <h1 className="page-title">MO<span>dels</span></h1>
@@ -142,8 +142,8 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({
         <div className="page-subtitle">browse · inspect · relate</div>
       </div>
 
-      <div className="workspace-stack animate-in">
-        <div className="card" id="model-detail-card">
+      <div className="workspace-stack models-stack animate-in">
+        <div className="card models-card" id="model-detail-card">
           <div className="card-header">
             <span className="card-title"><span className="card-title-accent">▸</span> {active.name}</span>
             <div className="model-count-badge-wrap">
