@@ -1,0 +1,16 @@
+.venv/
+
+__pycache__/
+*.py[cod]
+
+frontend/node_modules/
+frontend/dist/
+.claude/
+.local-consumer/
+.local-demo/
+scripts/
+
+qlab/static/qlab/index.html
+build/
+qlab/static/qlab/qlab.js
+qlab/static/qlab/qlab.css
