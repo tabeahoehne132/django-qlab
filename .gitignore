@@ -12,5 +12,3 @@ scripts/
 
 qlab/static/qlab/index.html
 build/
-qlab/static/qlab/qlab.js
-qlab/static/qlab/qlab.css
