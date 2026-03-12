@@ -331,6 +331,7 @@ export default function App() {
   const [historyItems, setHistoryItems] = useState<QueryHistoryItem[]>([])
   const [savedQueries, setSavedQueries] = useState<SavedQuery[]>([])
   const [metadataByModel, setMetadataByModel] = useState<Record<string, MetadataResponse>>({})
+  const [inspectMetadataByModel, setInspectMetadataByModel] = useState<Record<string, MetadataResponse>>({})
   const [queryPreset, setQueryPreset] = useState<QueryRequest | null>(null)
   const [queryResultPreset, setQueryResultPreset] = useState<QueryResponse | null>(null)
   const [activeSavedQueryId, setActiveSavedQueryId] = useState<number | null>(null)
@@ -513,7 +514,10 @@ export default function App() {
 
     const loadMetadata = async () => {
       try {
-        const metadata = await getModelMetadata(activeModel, activeModelEntry?.app_label)
+        const metadata = await getModelMetadata(activeModel, activeModelEntry?.app_label, {
+          relationDepth: 1,
+          includeReverseRelations: false,
+        })
         setMetadataByModel((current) => ({ ...current, [activeModel]: metadata }))
       } catch (error) {
         console.error(error)
@@ -522,6 +526,26 @@ export default function App() {
 
     void loadMetadata()
   }, [activeModel, activeModelEntry?.app_label, metadataByModel])
+
+  useEffect(() => {
+    if (activeTab !== 'models' || !activeModel || inspectMetadataByModel[activeModel]) {
+      return
+    }
+
+    const loadInspectMetadata = async () => {
+      try {
+        const metadata = await getModelMetadata(activeModel, activeModelEntry?.app_label, {
+          relationDepth: 2,
+          includeReverseRelations: true,
+        })
+        setInspectMetadataByModel((current) => ({ ...current, [activeModel]: metadata }))
+      } catch (error) {
+        console.error(error)
+      }
+    }
+
+    void loadInspectMetadata()
+  }, [activeModel, activeModelEntry?.app_label, activeTab, inspectMetadataByModel])
 
   const refreshHistory = async () => {
     try {
@@ -646,7 +670,7 @@ export default function App() {
   }
 
   const models: ModelDetail[] = bootstrapModels.map((model, index) => {
-    const metadata = metadataByModel[model.model_name]
+    const metadata = inspectMetadataByModel[model.model_name] || metadataByModel[model.model_name]
     const directFields = metadata
       ? (() => {
           const isBlockedLookup = buildBlockedLookupMatcher(metadata)

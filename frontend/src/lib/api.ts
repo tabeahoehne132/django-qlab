@@ -77,6 +77,11 @@ export interface MetadataResponse {
   all_lookups: string[]
 }
 
+interface MetadataRequestOptions {
+  relationDepth?: number
+  includeReverseRelations?: boolean
+}
+
 export interface QueryCondition {
   field: string
   op: string
@@ -167,12 +172,22 @@ export function getBootstrap() {
   return requestJson<BootstrapResponse>('/bootstrap/')
 }
 
-export function getModelMetadata(model: string, appLabel?: string) {
+export function getModelMetadata(
+  model: string,
+  appLabel?: string,
+  options?: MetadataRequestOptions,
+) {
   return requestJson<MetadataResponse>('/metadata/', {
     method: 'POST',
     body: JSON.stringify({
       model,
       ...(appLabel ? { app_label: appLabel } : {}),
+      ...(typeof options?.relationDepth === 'number'
+        ? { relation_depth: options.relationDepth }
+        : {}),
+      ...(typeof options?.includeReverseRelations === 'boolean'
+        ? { include_reverse_relations: options.includeReverseRelations }
+        : {}),
     }),
   })
 }

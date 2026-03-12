@@ -86,6 +86,19 @@ class MetaDataRequestSerializer(serializers.Serializer):
     model = serializers.CharField(
         help_text="Model name to retrieve metadata for (case-insensitive)"
     )
+    app_label = serializers.CharField(
+        required=False,
+        help_text="Optional Django app label containing the model.",
+    )
+    relation_depth = serializers.IntegerField(
+        required=False,
+        min_value=0,
+        help_text="Optional relation expansion depth for metadata generation.",
+    )
+    include_reverse_relations = serializers.BooleanField(
+        required=False,
+        help_text="Whether reverse relations should be included in metadata expansion.",
+    )
 
     def validate_model(self, value: str) -> str:
         if not model_exists(value):

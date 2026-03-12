@@ -1,3 +1,5 @@
+from functools import lru_cache
+
 from django.apps import apps
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
@@ -13,6 +15,37 @@ from qlab.serializers import (
     SavedQuerySerializer,
 )
 from qlab.settings import qlab_settings
+
+
+@lru_cache(maxsize=32)
+def _get_models_index(
+    allowed_apps: tuple[str, ...],
+    restricted_models: tuple[str, ...],
+    include_model_counts: bool,
+):
+    restricted = {item.lower() for item in restricted_models}
+    rows = []
+    for model in apps.get_models():
+        if allowed_apps and model._meta.app_label not in allowed_apps:
+            continue
+        if model.__name__.lower() in restricted:
+            continue
+
+        row = {
+            "app_label": model._meta.app_label,
+            "model_name": model.__name__,
+            "verbose_name": str(model._meta.verbose_name),
+            "verbose_name_plural": str(model._meta.verbose_name_plural),
+            "count": None,
+        }
+        if include_model_counts:
+            try:
+                row["count"] = model.objects.count()
+            except Exception:
+                row["count"] = None
+        rows.append(row)
+
+    return sorted(rows, key=lambda item: (item["app_label"], item["model_name"]))
 
 
 class QLabFrontendApiViewSet(
@@ -120,24 +153,11 @@ class QLabBootstrapViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     @extend_schema(summary="Get QLab Bootstrap Data")
     def list(self, request, *args, **kwargs):
         settings_obj, _ = QLabUserSettings.objects.get_or_create(user=request.user)
-        restricted_models = {
-            restricted.lower() for restricted in qlab_settings.RESTRICTED_MODELS
-        }
-        models_index = [
-            {
-                "app_label": model._meta.app_label,
-                "model_name": model.__name__,
-                "verbose_name": str(model._meta.verbose_name),
-                "verbose_name_plural": str(model._meta.verbose_name_plural),
-                "count": model.objects.count(),
-            }
-            for model in apps.get_models()
-            if (
-                not qlab_settings.ALLOWED_APPS
-                or model._meta.app_label in qlab_settings.ALLOWED_APPS
-            )
-            and model.__name__.lower() not in restricted_models
-        ]
+        models_index = _get_models_index(
+            tuple(qlab_settings.ALLOWED_APPS or ()),
+            tuple(qlab_settings.RESTRICTED_MODELS or ()),
+            bool(qlab_settings.INCLUDE_MODEL_COUNTS),
+        )
 
         return Response(
             {
@@ -147,10 +167,7 @@ class QLabBootstrapViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
                     "is_authenticated": True,
                 },
                 "settings": QLabUserSettingsSerializer(settings_obj).data,
-                "models": sorted(
-                    models_index,
-                    key=lambda item: (item["app_label"], item["model_name"]),
-                ),
+                "models": models_index,
                 "saved_queries": SavedQuerySerializer(
                     SavedQuery.objects.filter(user=request.user).order_by("name")[:20],
                     many=True,

@@ -695,7 +695,17 @@ class QLabMetadataMixin:
             return Response(serializer.errors, status=400)
 
         model_name = serializer.validated_data["model"]
-        app_label = request.data.get("app_label", qlab_settings.DEFAULT_APP_LABEL)
+        app_label = serializer.validated_data.get(
+            "app_label", qlab_settings.DEFAULT_APP_LABEL
+        )
+        relation_depth = serializer.validated_data.get(
+            "relation_depth", qlab_settings.METADATA_MAX_RELATION_DEPTH
+        )
+        relation_depth = min(max(relation_depth, 0), qlab_settings.MAX_RELATION_DEPTH)
+        include_reverse_relations = serializer.validated_data.get(
+            "include_reverse_relations",
+            qlab_settings.METADATA_INCLUDE_REVERSE_RELATIONS,
+        )
 
         allowed_app = _check_allowed_app(app_label)
         if allowed_app:
@@ -707,7 +717,8 @@ class QLabMetadataMixin:
         metadata = get_model_metadata(
             model_name,
             app_label=app_label,
-            max_depth=qlab_settings.MAX_RELATION_DEPTH,
+            max_depth=relation_depth,
+            include_reverse_relations=include_reverse_relations,
         )
 
         return Response(ModelMetadataSerializer(metadata).data)
