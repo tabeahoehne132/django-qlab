@@ -296,6 +296,24 @@ interface ToastItem {
   message: string
 }
 
+const titleCaseWords = (value: string) =>
+  value
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+
+const splitModelIdentifier = (value: string) =>
+  value
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/_/g, ' ')
+    .trim()
+
+const getModelDisplayLabel = (model: Pick<BootstrapModel, 'model_name' | 'verbose_name'>) => {
+  const raw = model.verbose_name?.trim() || splitModelIdentifier(model.model_name)
+  return titleCaseWords(raw)
+}
+
 // ─── App ─────────────────────────────────────────────────────────────────────
 
 export default function App() {
@@ -542,8 +560,7 @@ export default function App() {
   }
 
   const handleRecentQuerySelect = (query: RecentQuery) => {
-    const modelFromMeta = query.meta.split(' · ')[0]
-    const match = bootstrapModels.find((model) => model.model_name === modelFromMeta)
+    const match = bootstrapModels.find((model) => model.model_name === query.modelName)
     if (match) {
       handleModelSelect(match.model_name)
     }
@@ -662,6 +679,7 @@ export default function App() {
       : []
     return {
       name: model.model_name,
+      displayName: getModelDisplayLabel(model),
       count: model.count || 0,
       color: colors[index % colors.length],
       appLabel: model.app_label,
@@ -690,21 +708,36 @@ export default function App() {
   })
 
   const recentQueries: RecentQuery[] = historyItems.slice(0, 4).map((item) => ({
-    title: item.title || `${item.model_name} query`,
-    meta: `${item.model_name} · ${item.result_count ?? 0} results`,
+    title: item.title || `${getModelDisplayLabel(bootstrapModels.find((model) => model.model_name === item.model_name) || { model_name: item.model_name, verbose_name: item.model_name, app_label: '', verbose_name_plural: '' })} query`,
+    meta: `${getModelDisplayLabel(bootstrapModels.find((model) => model.model_name === item.model_name) || { model_name: item.model_name, verbose_name: item.model_name, app_label: '', verbose_name_plural: '' })} · ${item.result_count ?? 0} results`,
+    modelName: item.model_name,
+  }))
+
+  const savedQueriesForView = savedQueries.map((query) => ({
+    ...query,
+    display_name: query.name === `${query.model_name} query`
+      ? `${getModelDisplayLabel(bootstrapModels.find((model) => model.model_name === query.model_name) || { model_name: query.model_name, verbose_name: query.model_name })} query`
+      : query.name,
+    display_model_name: getModelDisplayLabel(
+      bootstrapModels.find((model) => model.model_name === query.model_name) || { model_name: query.model_name, verbose_name: query.model_name },
+    ),
   }))
 
   const savedQueryNavItems = savedQueries.map((query) => ({
     id: query.id,
-    name: query.name,
+    name: query.name === `${query.model_name} query`
+      ? `${getModelDisplayLabel(bootstrapModels.find((model) => model.model_name === query.model_name) || { model_name: query.model_name, verbose_name: query.model_name, app_label: '', verbose_name_plural: '' })} query`
+      : query.name,
     modelName: query.model_name,
+    modelLabel: getModelDisplayLabel(bootstrapModels.find((model) => model.model_name === query.model_name) || { model_name: query.model_name, verbose_name: query.model_name, app_label: '', verbose_name_plural: '' }),
     updatedAt: query.updated_at,
   }))
 
   const historyViewItems: HistoryItem[] = historyItems.map((item) => ({
     id: item.id,
-    title: item.title || `${item.model_name} query`,
+    title: item.title || `${getModelDisplayLabel(bootstrapModels.find((model) => model.model_name === item.model_name) || { model_name: item.model_name, verbose_name: item.model_name })} query`,
     model: item.model_name,
+    modelLabel: getModelDisplayLabel(bootstrapModels.find((model) => model.model_name === item.model_name) || { model_name: item.model_name, verbose_name: item.model_name }),
     filters: item.query_payload.filter_fields ? 'custom filters' : 'all records',
     ranAt: new Date(item.created_at).toLocaleString(),
     duration: item.duration_ms ? `${item.duration_ms} ms` : '—',
@@ -863,9 +896,10 @@ export default function App() {
           </div>
         )}
         {activeTab === 'queries' && (
-          <QueriesPage
-            activeModel={activeModel}
-            activeAppLabel={activeModelEntry?.app_label}
+              <QueriesPage
+                activeModel={activeModel}
+                activeModelLabel={activeModelEntry ? getModelDisplayLabel(activeModelEntry) : activeModel}
+                activeAppLabel={activeModelEntry?.app_label}
             fieldOptions={fieldOptions}
             metadataLoading={Boolean(activeModel) && !activeMetadata}
             defaultPageSize={defaultPageSize}
@@ -921,9 +955,9 @@ export default function App() {
           />
         )}
         {activeTab === 'saved' && (
-          <SavedQueriesPage
-            savedQueries={savedQueries}
-            activeSavedQueryId={activeSavedQueryId}
+              <SavedQueriesPage
+                savedQueries={savedQueriesForView}
+                activeSavedQueryId={activeSavedQueryId}
             onSelectSavedQuery={setActiveSavedQueryId}
             onUpdateSavedQuery={async (id, payload) => {
               try {

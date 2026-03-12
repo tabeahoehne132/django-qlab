@@ -4,6 +4,7 @@ import './ContentSidebar.css'
 
 export interface ModelEntry {
   name: string
+  displayName?: string
   count: number
   color: string
   appLabel?: string
@@ -13,12 +14,14 @@ export interface ModelEntry {
 export interface RecentQuery {
   title: string
   meta: string
+  modelName: string
 }
 
 export interface SavedQueryNavItem {
   id: number
   name: string
   modelName: string
+  modelLabel?: string
   updatedAt: string
 }
 
@@ -114,7 +117,7 @@ const ModelListItem: React.FC<{
     onClick={() => onSelect(model.name)}
   >
     <div className="res-pip" style={{ background: model.color, color: model.color }} />
-    <span className="res-name">{model.name}</span>
+    <span className="res-name">{model.displayName || model.name}</span>
     <span className="res-count">{model.count.toLocaleString()}</span>
     {onToggleFavorite && (
       <FavoriteButton active={Boolean(model.favorite)} onClick={() => onToggleFavorite(model.name)} />
@@ -440,8 +443,8 @@ const SavedSidebarPanel: React.FC<{
             className={`recent-item saved-query-item${activeId === query.id ? ' active' : ''}`}
             onClick={() => onSelect?.(query.id)}
           >
-            <div className="recent-title">{query.name}</div>
-            <div className="recent-meta">{query.modelName} · {new Date(query.updatedAt).toLocaleDateString()}</div>
+                    <div className="recent-title">{query.name}</div>
+                    <div className="recent-meta">{query.modelLabel || query.modelName} · {new Date(query.updatedAt).toLocaleDateString()}</div>
           </div>
         ))}
       </div>

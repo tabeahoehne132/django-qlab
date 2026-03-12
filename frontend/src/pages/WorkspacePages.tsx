@@ -35,6 +35,7 @@ interface HistoryItem {
   id: string | number
   title: string
   model: string
+  modelLabel?: string
   filters: string
   ranAt: string
   duration: string
@@ -94,7 +95,7 @@ interface DocsPageProps {
 }
 
 interface SavedQueriesPageProps {
-  savedQueries: SavedQuery[]
+  savedQueries: Array<SavedQuery & { display_name?: string; display_model_name?: string }>
   activeSavedQueryId: number | null
   onSelectSavedQuery: (id: number) => void
   onUpdateSavedQuery: (id: number, payload: Partial<SavedQuery>) => Promise<void>
@@ -145,7 +146,7 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({
       <div className="workspace-stack models-stack animate-in">
         <div className="card models-card" id="model-detail-card">
           <div className="card-header">
-            <span className="card-title"><span className="card-title-accent">▸</span> {active.name}</span>
+            <span className="card-title"><span className="card-title-accent">▸</span> {active.displayName || active.name}</span>
             <div className="model-count-badge-wrap">
               <span className="badge badge-active">{active.count.toLocaleString()} records</span>
             </div>
@@ -285,8 +286,8 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ historyItems, onReplay
               />
               <span className={`history-status-dot ${statusClass[item.status]}`} />
               <div className="history-main">
-                <div className="history-query-name">{item.title || `${item.model} query`}</div>
-                <div className="history-query-params">{item.model} · {item.filters}</div>
+                <div className="history-query-name">{item.title || `${item.modelLabel || item.model} query`}</div>
+                <div className="history-query-params">{item.modelLabel || item.model} · {item.filters}</div>
               </div>
               <div className="history-meta">
                 <span className="history-time">{item.ranAt}</span>
@@ -481,8 +482,8 @@ export const SavedQueriesPage: React.FC<SavedQueriesPageProps> = ({
                     ))}
                   />
                   <div className="saved-query-list-copy">
-                    <span className="saved-query-list-name">{query.name}</span>
-                    <span className="saved-query-list-meta">{query.model_name} · {new Date(query.updated_at).toLocaleDateString()}</span>
+                    <span className="saved-query-list-name">{query.display_name || query.name}</span>
+                    <span className="saved-query-list-meta">{query.display_model_name || query.model_name} · {new Date(query.updated_at).toLocaleDateString()}</span>
                   </div>
                 </div>
               ))}
@@ -492,7 +493,7 @@ export const SavedQueriesPage: React.FC<SavedQueriesPageProps> = ({
               {activeQuery ? (
                 <>
                   <div className="saved-query-detail-meta">
-                    <span className="saved-query-detail-model">Model: {activeQuery.model_name}</span>
+                    <span className="saved-query-detail-model">Model: {activeQuery.display_model_name || activeQuery.model_name}</span>
                   </div>
                   <div className="saved-query-form-grid">
                     <label className="saved-query-field">

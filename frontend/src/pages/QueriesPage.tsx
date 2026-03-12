@@ -173,14 +173,15 @@ function deserializeFilters(
 
 interface ResourceRowProps {
   activeModel: string
+  activeModelLabel?: string
 }
 
-const ResourceRow: React.FC<ResourceRowProps> = ({ activeModel }) => (
+const ResourceRow: React.FC<ResourceRowProps> = ({ activeModel, activeModelLabel }) => (
   <div className="resource-row">
     <span className="from-label">FROM</span>
     <div className="resource-current">
       <button className="resource-chip active" type="button">
-        {activeModel}
+        {activeModelLabel || activeModel}
       </button>
       <span className="field-hint">Change model in the left sidebar.</span>
     </div>
@@ -401,6 +402,7 @@ const ResultsTable: React.FC<ResultsTableProps> = ({
 
 interface QueriesPageProps {
   activeModel: string
+  activeModelLabel?: string
   activeAppLabel?: string
   fieldOptions: string[]
   metadataLoading?: boolean
@@ -424,6 +426,7 @@ type FieldDialogState =
 
 export const QueriesPage: React.FC<QueriesPageProps> = ({
   activeModel,
+  activeModelLabel,
   activeAppLabel,
   fieldOptions,
   metadataLoading = false,
@@ -678,12 +681,12 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
       filter_fields: serializeFilters(filters),
       page,
       page_size: limit,
-      title: `${activeModel} query`,
+      title: `${activeModelLabel || activeModel} query`,
     }
   }
 
   const openSaveDialog = () => {
-    setSaveName(`${activeModel} query`)
+    setSaveName(`${activeModelLabel || activeModel} query`)
     setSaveDescription('')
     setSaveState('idle')
     setSaveDialogOpen(true)
@@ -774,7 +777,8 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
 
   const rows = (results?.results || []) as ResultRow[]
   const fieldDialogTitle = fieldDialog?.type === 'filter' ? 'Choose filter field' : 'Add field'
-  const fieldDialogModelLabel = fieldDialog?.type === 'filter' ? `${activeModel} rule` : activeModel
+  const displayModelLabel = activeModelLabel || activeModel
+  const fieldDialogModelLabel = fieldDialog?.type === 'filter' ? `${displayModelLabel} rule` : displayModelLabel
   const sortedResults = [...rows].sort((left, right) => {
     const leftValue = left[sortField] ?? ''
     const rightValue = right[sortField] ?? ''
@@ -795,10 +799,10 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
 
       <div className="card animate-in query-builder-card">
         <div className="card-header">
-          <span className="card-title">QLab · <span className="card-title-accent">{activeModel}</span></span>
+          <span className="card-title">QLab · <span className="card-title-accent">{displayModelLabel}</span></span>
         </div>
         <div className="card-body">
-          <ResourceRow activeModel={activeModel} />
+        <ResourceRow activeModel={activeModel} activeModelLabel={activeModelLabel} />
 
           <div className="field-selector">
             <span className="from-label">SELECT</span>
