@@ -8,10 +8,10 @@ Defines serializers for:
 """
 
 from rest_framework import serializers
+
 from qlab.helpers import model_exists
 from qlab.models import QLabUserSettings, QueryRunHistory, SavedQuery
 from qlab.settings import qlab_settings
-
 
 # ---------------------------------------------------------------------------
 # Field & Model Metadata

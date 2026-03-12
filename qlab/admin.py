@@ -44,6 +44,12 @@ class QueryRunHistoryAdmin(admin.ModelAdmin):
         "duration_ms",
         "created_at",
     )
-    search_fields = ("title", "model_name", "app_label", "user__username", "error_message")
+    search_fields = (
+        "title",
+        "model_name",
+        "app_label",
+        "user__username",
+        "error_message",
+    )
     list_filter = ("status", "app_label", "model_name", "created_at")
     readonly_fields = ("created_at",)

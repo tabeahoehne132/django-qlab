@@ -1,4 +1,4 @@
-from setuptools import setup, find_packages
+from setuptools import find_packages, setup
 
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
@@ -48,6 +48,7 @@ setup(
             "pytest-django>=4.5",
             "black>=23.0",
             "ruff>=0.1",
+            "pre-commit>=4.0",
         ],
     },
 )

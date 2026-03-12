@@ -1,4 +1,5 @@
 from django.urls import path
+
 from .api_views import (
     QLabBootstrapViewSet,
     QLabFrontendApiViewSet,
@@ -49,6 +50,8 @@ urlpatterns = [
         SavedQueryViewSet.as_view({"post": "run"}),
         name="saved-query-run",
     ),
-    path("api/history/", QueryRunHistoryViewSet.as_view({"get": "list"}), name="history"),
+    path(
+        "api/history/", QueryRunHistoryViewSet.as_view({"get": "list"}), name="history"
+    ),
     path("", QLabView.as_view(), name="index"),
 ]

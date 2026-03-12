@@ -12,13 +12,15 @@ Usage:
         permission_classes = [IsAuthenticated, MyCustomPermission]
 """
 
+from time import monotonic
+from typing import Optional
+
 from django.apps import apps
-from django.core.paginator import Paginator
-from django.core.paginator import EmptyPage, PageNotAnInteger
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import Q
 from django.utils import timezone
-from drf_spectacular.utils import extend_schema, OpenApiExample, inline_serializer
+from drf_spectacular.utils import OpenApiExample, extend_schema, inline_serializer
 from rest_framework import serializers
 from rest_framework.response import Response
 
@@ -26,13 +28,11 @@ from qlab.helpers import build_q, get_model_metadata
 from qlab.model_validation import ValidationError
 from qlab.pydantic_filters import QueryFilter
 from qlab.serializers import (
-    ResponseSerializer,
-    ModelMetadataSerializer,
     MetaDataRequestSerializer,
+    ModelMetadataSerializer,
+    ResponseSerializer,
 )
 from qlab.settings import qlab_settings
-from typing import Optional
-from time import monotonic
 
 # Reusable error response schema for Swagger
 _ERROR_SCHEMA = inline_serializer(
@@ -288,7 +288,10 @@ class QLabMixin:
         # Apply custom scoping via get_queryset(), then apply QLab filters on top
         try:
             raw_results = (
-                self.get_queryset(model).filter(q_obj).order_by("id").values(*select_fields)
+                self.get_queryset(model)
+                .filter(q_obj)
+                .order_by("id")
+                .values(*select_fields)
             )
 
             page_size = min(
@@ -356,9 +359,9 @@ class QLabMixin:
             "page_size": page_size,
             "total_pages": paginator.num_pages,
             "next": page_obj.next_page_number() if page_obj.has_next() else None,
-            "previous": page_obj.previous_page_number()
-            if page_obj.has_previous()
-            else None,
+            "previous": (
+                page_obj.previous_page_number() if page_obj.has_previous() else None
+            ),
             "results": results,
         }
 
@@ -580,9 +583,9 @@ class NeighborhoodMixin:
         from django.db.models.fields.related import (
             ForeignKey,
             ManyToManyField,
-            OneToOneField,
-            ManyToOneRel,
             ManyToManyRel,
+            ManyToOneRel,
+            OneToOneField,
             OneToOneRel,
         )
 
@@ -634,9 +637,11 @@ class NeighborhoodMixin:
                             "pks": list(
                                 getattr(obj, accessor).values_list("pk", flat=True)
                             ),
-                            "filter_name": field.name
-                            if hasattr(field, "name")
-                            else field.related_query_name(),
+                            "filter_name": (
+                                field.name
+                                if hasattr(field, "name")
+                                else field.related_query_name()
+                            ),
                         }
                 except Exception:
                     relations[accessor] = {"pks": [], "filter_name": accessor}

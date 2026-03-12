@@ -12,15 +12,16 @@ QueryFilter performs comprehensive validation before query execution,
 ensuring type safety and preventing invalid database queries.
 """
 
-from pydantic import BaseModel, field_validator, model_validator
 from typing import Optional
+
 from django.apps import apps
+from pydantic import BaseModel, field_validator, model_validator
 
 from qlab.helpers import (
-    model_exists,
-    is_valid_lookup_syntax,
-    flatten_filter_conditions,
     check_attribute_operation,
+    flatten_filter_conditions,
+    is_valid_lookup_syntax,
+    model_exists,
     validate_field_path,
 )
 from qlab.model_validation import Filter, ValidationError

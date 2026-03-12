@@ -6,7 +6,6 @@ Allows users to customize QLab behavior via Django settings.
 
 from django.conf import settings
 
-
 # Default settings
 QLAB_DEFAULTS = {
     "DEFAULT_APP_LABEL": "core",
