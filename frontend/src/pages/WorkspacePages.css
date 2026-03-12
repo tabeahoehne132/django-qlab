@@ -1,5 +1,7 @@
 .workspace-page {
   gap: 14px;
+  overflow: hidden;
+  min-height: 0;
 }
 
 .workspace-single,
@@ -7,6 +9,8 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  flex: 1;
+  min-height: 0;
 }
 
 .models-page {
@@ -26,11 +30,6 @@
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
-}
-
-.saved-queries-page {
-  overflow: hidden;
-  min-height: 0;
 }
 
 .saved-queries-stack {
@@ -308,6 +307,17 @@
 .history-list {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.history-card {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .history-item {
@@ -451,6 +461,14 @@
   flex-direction: column;
   gap: 0;
   overflow-y: auto;
+  min-height: 0;
+}
+
+.settings-card {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
 }
 
 .settings-section-title,
@@ -617,10 +635,24 @@
   padding: 20px 24px;
   background: var(--surface);
   border-radius: 6px;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .docs-content-single {
   padding-top: 18px;
+}
+
+.docs-stack,
+.docs-card {
+  flex: 1;
+  min-height: 0;
+}
+
+.docs-card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .docs-h1 {

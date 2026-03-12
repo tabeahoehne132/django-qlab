@@ -82,6 +82,41 @@ urlpatterns = [
 ]
 ```
 
+Optional: enforce a login redirect for the packaged UI by subclassing `QLabView`:
+
+```python
+from django.urls import include, path
+from django.contrib.auth.mixins import LoginRequiredMixin
+from rest_framework import permissions
+
+from qlab.views import QLabView
+from qlab.api_views import QLabFrontendApiViewSet
+
+
+class SecuredQLabView(LoginRequiredMixin, QLabView):
+    login_url = "/django/admin/login/"
+
+
+class ScopedQLabViewSet(QLabFrontendApiViewSet):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self, model):
+        return model.objects.filter(business_group=self.request.user.business_group)
+
+
+urlpatterns = [
+    path("qlab/", SecuredQLabView.as_view(), name="qlab"),
+    path("qlab/", include("qlab.urls")),
+    path(
+        "qlab/api/query/",
+        ScopedQLabViewSet.as_view({"post": "post"}),
+        name="qlab-custom-query",
+    ),
+]
+```
+
+Use the custom `QLabFrontendApiViewSet` only if you need queryset scoping per user, tenant, or business group.
+
 Collect static files if your project requires it:
 
 ```bash

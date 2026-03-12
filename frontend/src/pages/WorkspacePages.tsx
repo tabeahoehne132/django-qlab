@@ -245,7 +245,7 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ historyItems, onReplay
         <div className="page-subtitle">recent · replay · export</div>
       </div>
 
-      <div className="card animate-in">
+      <div className="card animate-in history-card">
         <div className="card-header">
           <span className="card-title">Run <span className="card-title-accent">History</span></span>
           {selectedIds.length > 0 && (
@@ -322,7 +322,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ sections, activeSett
       </div>
 
       <div className="workspace-stack animate-in saved-queries-stack">
-        <div className="card saved-queries-card">
+        <div className="card saved-queries-card settings-card">
           <div className="card-header">
             <span className="card-title">{section.title}</span>
           </div>
@@ -356,8 +356,8 @@ export const DocsPage: React.FC<DocsPageProps> = ({ docs, activeDocKey }) => {
         <div className="page-subtitle">reference · examples · guides</div>
       </div>
 
-      <div className="workspace-stack animate-in">
-        <div className="card">
+      <div className="workspace-stack animate-in docs-stack">
+        <div className="card docs-card">
           <div className="card-body docs-content docs-content-single">
             <div className="docs-h1">
               {entry.title.split(' ')[0]} <span>{entry.title.split(' ').slice(1).join(' ')}</span>

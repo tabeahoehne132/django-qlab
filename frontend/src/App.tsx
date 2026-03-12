@@ -106,15 +106,17 @@ const DOCS_ENTRIES: DocsEntry[] = [
     section: 'Getting Started',
     title: 'Installation',
     tagline: 'Install the package and expose both API and UI.',
-    intro: 'Install directly from GitHub, add qlab to INSTALLED_APPS and mount qlab.urls if you want the packaged browser UI.',
+    intro: 'Install directly from GitHub, add qlab to INSTALLED_APPS, mount qlab.urls, and optionally subclass QLabView or the frontend ViewSet in the consumer project.',
     endpoints: [
       { method: 'GET', path: '/qlab/', description: 'bundled UI entrypoint' },
     ],
     params: [
       { name: 'INSTALLED_APPS', type: 'list', description: 'Must include qlab and staticfiles.' },
       { name: 'urlpatterns', type: 'list', description: 'Include qlab.urls to mount the UI.' },
+      { name: 'QLabView', type: 'class', description: 'Optional UI view base if you need login redirects or custom auth flow integration.' },
+      { name: 'QLabFrontendApiViewSet', type: 'class', description: 'Optional frontend ViewSet base for queryset scoping.' },
     ],
-    code: `pip install git+https://github.com/tabeahoehne132/django-qlab.git\n\nINSTALLED_APPS = [\n    "django.contrib.staticfiles",\n    "qlab",\n]`,
+    code: `pip install git+https://github.com/tabeahoehne132/django-qlab.git\n\nINSTALLED_APPS = [\n    "django.contrib.staticfiles",\n    "qlab",\n]\n\nfrom django.contrib.auth.mixins import LoginRequiredMixin\nfrom django.urls import include, path\nfrom rest_framework import permissions\n\nfrom qlab.api_views import QLabFrontendApiViewSet\nfrom qlab.views import QLabView\n\nclass SecuredQLabView(LoginRequiredMixin, QLabView):\n    login_url = "/django/admin/login/"\n\nclass ScopedQLabViewSet(QLabFrontendApiViewSet):\n    permission_classes = [permissions.IsAuthenticated]\n\n    def get_queryset(self, model):\n        return model.objects.filter(business_group=self.request.user.business_group)\n\nurlpatterns = [\n    path("qlab/", SecuredQLabView.as_view(), name="qlab"),\n    path("qlab/", include("qlab.urls")),\n    path("qlab/api/query/", ScopedQLabViewSet.as_view({"post": "post"})),\n]`,
   },
   {
     key: 'quick-start',
