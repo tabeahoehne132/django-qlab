@@ -1,4 +1,4 @@
-from setuptools import setup, find_packages
+from setuptools import find_packages, setup
 
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
@@ -12,6 +12,14 @@ setup(
     long_description_content_type="text/markdown",
     url="https://github.com/tabeahoehne132/django-qlab",
     packages=find_packages(),
+    package_data={
+        "qlab": [
+            "templates/qlab/*.html",
+            "static/qlab/*.js",
+            "static/qlab/*.css",
+            "static/qlab/assets/*",
+        ],
+    },
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
@@ -40,6 +48,9 @@ setup(
             "pytest-django>=4.5",
             "black>=23.0",
             "ruff>=0.1",
+            "pre-commit>=4.0",
+            "build>=1.2",
+            "twine>=5.1",
         ],
     },
 )

@@ -8,21 +8,23 @@ This module provides core functionality for:
 - Operation validation per field type
 """
 
+import re
+from copy import deepcopy
+from functools import lru_cache
 from typing import List, Optional
+
 from django.apps import apps
-from django.db.models import ForeignKey, ManyToManyField
-from django.db.models.fields.related import (
-    ManyToOneRel,
-    ManyToManyRel,
-    OneToOneRel,
-    OneToOneField,
-)
 from django.core.exceptions import FieldDoesNotExist
 from django.db import models
-from django.db.models import Q
-import re
+from django.db.models import ForeignKey, ManyToManyField, Q
+from django.db.models.fields.related import (
+    ManyToManyRel,
+    ManyToOneRel,
+    OneToOneField,
+    OneToOneRel,
+)
 
-from qlab.model_validation import Filter, Condition
+from qlab.model_validation import Condition, Filter
 from qlab.settings import qlab_settings
 
 
@@ -140,6 +142,7 @@ def extract_field_metadata(
     max_depth: int = 2,
     current_depth: int = 0,
     visited_models: Optional[set] = None,
+    include_reverse_relations: bool = False,
 ) -> tuple[List[dict], List[str]]:
     """
     Recursively extract metadata for all fields in a model, including related fields.
@@ -187,6 +190,8 @@ def extract_field_metadata(
 
     for field in model._meta.get_fields():
         is_reverse = isinstance(field, (ManyToOneRel, ManyToManyRel, OneToOneRel))
+        if is_reverse and not include_reverse_relations:
+            continue
 
         # Determine field name / accessor
         if is_reverse:
@@ -221,6 +226,7 @@ def extract_field_metadata(
                     max_depth=max_depth,
                     current_depth=current_depth + 1,
                     visited_models=visited_models.copy(),
+                    include_reverse_relations=include_reverse_relations,
                 )
                 fields_metadata.extend(related_fields)
                 all_lookups.extend(related_lookups)
@@ -242,7 +248,7 @@ def extract_field_metadata(
 
             if hasattr(field, "choices") and field.choices:
                 field_info["choices"] = [
-                    {"value": choice[0], "label": str(choice[1])}
+                    {"value": str(choice[0]), "label": str(choice[1])}
                     for choice in field.choices
                 ]
 
@@ -265,6 +271,7 @@ def extract_field_metadata(
                         max_depth=max_depth,
                         current_depth=current_depth + 1,
                         visited_models=visited_models.copy(),
+                        include_reverse_relations=include_reverse_relations,
                     )
                     fields_metadata.extend(related_fields)
                     all_lookups.extend(related_lookups)
@@ -272,8 +279,12 @@ def extract_field_metadata(
     return fields_metadata, all_lookups
 
 
-def get_model_metadata(
-    model_name: str, app_label: str = "core", max_depth: int = 2
+@lru_cache(maxsize=256)
+def _get_model_metadata_cached(
+    model_name: str,
+    app_label: str = "core",
+    max_depth: int = 2,
+    include_reverse_relations: bool = False,
 ) -> dict:
     """
     Get comprehensive metadata for a Django model.
@@ -307,7 +318,11 @@ def get_model_metadata(
         max_depth = qlab_settings.MAX_RELATION_DEPTH
     model = apps.get_model(app_label, model_name)
 
-    fields, lookups = extract_field_metadata(model, max_depth=max_depth)
+    fields, lookups = extract_field_metadata(
+        model,
+        max_depth=max_depth,
+        include_reverse_relations=include_reverse_relations,
+    )
 
     return {
         "model_name": model.__name__,
@@ -316,6 +331,25 @@ def get_model_metadata(
         "fields": fields,
         "all_lookups": sorted(lookups),
     }
+
+
+def get_model_metadata(
+    model_name: str,
+    app_label: str = "core",
+    max_depth: int = 2,
+    include_reverse_relations: bool = False,
+) -> dict:
+    """
+    Return model metadata with a defensive copy of the cached payload.
+    """
+    return deepcopy(
+        _get_model_metadata_cached(
+            model_name=model_name,
+            app_label=app_label,
+            max_depth=max_depth,
+            include_reverse_relations=include_reverse_relations,
+        )
+    )
 
 
 def build_q(filter_obj: Filter) -> Q:
@@ -581,6 +615,7 @@ def validate_field_path(model, field_path: str, errors: list) -> bool:
         return validate_field_path(related_model, remaining_path, errors)
 
 
+@lru_cache(maxsize=512)
 def model_exists(model_name: str):
     """
     Check if a model exists in any installed Django app.

@@ -8,8 +8,10 @@ Defines serializers for:
 """
 
 from rest_framework import serializers
-from qlab.helpers import model_exists
 
+from qlab.helpers import model_exists
+from qlab.models import QLabUserSettings, QueryRunHistory, SavedQuery
+from qlab.settings import qlab_settings
 
 # ---------------------------------------------------------------------------
 # Field & Model Metadata
@@ -84,6 +86,19 @@ class MetaDataRequestSerializer(serializers.Serializer):
     model = serializers.CharField(
         help_text="Model name to retrieve metadata for (case-insensitive)"
     )
+    app_label = serializers.CharField(
+        required=False,
+        help_text="Optional Django app label containing the model.",
+    )
+    relation_depth = serializers.IntegerField(
+        required=False,
+        min_value=0,
+        help_text="Optional relation expansion depth for metadata generation.",
+    )
+    include_reverse_relations = serializers.BooleanField(
+        required=False,
+        help_text="Whether reverse relations should be included in metadata expansion.",
+    )
 
     def validate_model(self, value: str) -> str:
         if not model_exists(value):
@@ -114,3 +129,101 @@ class ResponseSerializer(serializers.Serializer):
     results = serializers.ListField(
         help_text="List of result objects with the requested fields"
     )
+
+
+# ---------------------------------------------------------------------------
+# Frontend Persistence
+# ---------------------------------------------------------------------------
+
+
+class QLabUserSettingsSerializer(serializers.ModelSerializer):
+    def validate_default_page_size(self, value: int) -> int:
+        if value < 1:
+            raise serializers.ValidationError("default_page_size must be at least 1.")
+        if value > qlab_settings.MAX_PAGE_SIZE:
+            raise serializers.ValidationError(
+                f"default_page_size cannot exceed {qlab_settings.MAX_PAGE_SIZE}."
+            )
+        return value
+
+    class Meta:
+        model = QLabUserSettings
+        fields = [
+            "theme",
+            "default_page_size",
+            "last_active_tab",
+            "active_docs_key",
+            "active_settings_key",
+            "ui_state",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["created_at", "updated_at"]
+
+
+class SavedQuerySerializer(serializers.ModelSerializer):
+    def validate_tags(self, value):
+        if not isinstance(value, list):
+            raise serializers.ValidationError("tags must be a list.")
+        if any(not isinstance(tag, str) for tag in value):
+            raise serializers.ValidationError("tags must only contain strings.")
+        return value
+
+    def validate_query_payload(self, value):
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("query_payload must be an object.")
+        return value
+
+    class Meta:
+        model = SavedQuery
+        fields = [
+            "id",
+            "name",
+            "description",
+            "app_label",
+            "model_name",
+            "query_payload",
+            "tags",
+            "is_shared",
+            "last_run_at",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "last_run_at", "created_at", "updated_at"]
+
+    def validate_model_name(self, value: str) -> str:
+        if not value:
+            raise serializers.ValidationError("model_name is required.")
+        return value
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        if not attrs.get("app_label"):
+            attrs["app_label"] = (
+                self.instance.app_label
+                if self.instance and self.instance.app_label
+                else qlab_settings.DEFAULT_APP_LABEL
+            )
+        return attrs
+
+
+class QueryRunHistorySerializer(serializers.ModelSerializer):
+    saved_query_name = serializers.CharField(source="saved_query.name", read_only=True)
+
+    class Meta:
+        model = QueryRunHistory
+        fields = [
+            "id",
+            "title",
+            "app_label",
+            "model_name",
+            "query_payload",
+            "status",
+            "duration_ms",
+            "result_count",
+            "error_message",
+            "saved_query",
+            "saved_query_name",
+            "created_at",
+        ]
+        read_only_fields = fields

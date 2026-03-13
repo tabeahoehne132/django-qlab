@@ -1,3 +1,35 @@
+Metadata-Version: 2.4
+Name: django-qlab
+Version: 0.2.2
+Summary: Dynamic query API for Django REST Framework
+Home-page: https://github.com/tabeahoehne132/django-qlab
+Author: Tabea Hoehne
+License: MIT
+Project-URL: Homepage, https://github.com/tabeahoehne132/django-qlab
+Project-URL: Documentation, https://github.com/tabeahoehne132/django-qlab#readme
+Project-URL: Repository, https://github.com/tabeahoehne132/django-qlab
+Keywords: django,rest,api,query,filter,metadata
+Classifier: Framework :: Django
+Classifier: Programming Language :: Python :: 3
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: Django>=4.0
+Requires-Dist: djangorestframework>=3.14
+Requires-Dist: pydantic>=2.0
+Requires-Dist: drf-spectacular>=0.26
+Provides-Extra: dev
+Requires-Dist: pytest>=7.0; extra == "dev"
+Requires-Dist: pytest-django>=4.5; extra == "dev"
+Requires-Dist: black>=23.0; extra == "dev"
+Requires-Dist: ruff>=0.1; extra == "dev"
+Requires-Dist: pre-commit>=4.0; extra == "dev"
+Requires-Dist: build>=1.2; extra == "dev"
+Requires-Dist: twine>=5.1; extra == "dev"
+Dynamic: home-page
+Dynamic: license-file
+Dynamic: requires-python
+
 # django-qlab
 
 Packaged QLab for Django REST Framework: dynamic querying, metadata discovery, saved queries, history, and a bundled React UI.

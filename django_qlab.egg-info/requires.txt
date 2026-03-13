@@ -1,0 +1,13 @@
+Django>=4.0
+djangorestframework>=3.14
+pydantic>=2.0
+drf-spectacular>=0.26
+
+[dev]
+pytest>=7.0
+pytest-django>=4.5
+black>=23.0
+ruff>=0.1
+pre-commit>=4.0
+build>=1.2
+twine>=5.1

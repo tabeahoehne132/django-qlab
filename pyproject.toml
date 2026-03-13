@@ -31,6 +31,44 @@ dev = [
     "pytest-django>=4.5",
     "black>=23.0",
     "ruff>=0.1",
+    "pre-commit>=4.0",
+    "build>=1.2",
+    "twine>=5.1",
+]
+
+[tool.black]
+line-length = 88
+target-version = ["py39"]
+extend-exclude = """
+(
+  qlab/static/qlab/.*|
+  build/.*|
+  django_qlab\\.egg-info/.*|
+  frontend/.*|
+  docs/.*\\.svg
+)
+"""
+
+[tool.ruff]
+line-length = 88
+target-version = "py39"
+extend-exclude = [
+    "build",
+    "django_qlab.egg-info",
+    "frontend",
+    "qlab/static/qlab",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = ["E501"]
+
+[tool.setuptools.package-data]
+qlab = [
+    "templates/qlab/*.html",
+    "static/qlab/*.js",
+    "static/qlab/*.css",
+    "static/qlab/assets/*",
 ]
 
 [project.urls]

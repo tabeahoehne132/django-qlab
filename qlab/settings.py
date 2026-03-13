@@ -6,17 +6,20 @@ Allows users to customize QLab behavior via Django settings.
 
 from django.conf import settings
 
-
 # Default settings
 QLAB_DEFAULTS = {
     "DEFAULT_APP_LABEL": "core",
     "PAGE_SIZE": 100,
     "MAX_PAGE_SIZE": 500,
     "MAX_RELATION_DEPTH": 2,
+    "METADATA_MAX_RELATION_DEPTH": 1,
+    "METADATA_INCLUDE_REVERSE_RELATIONS": False,
     "MAX_FILTER_CONDITIONS": 10,
     "MAX_NODES": 100,
+    "MAX_HISTORY_ROWS": 100,
     "ALLOWED_APPS": [],
     "RESTRICTED_MODELS": [],
+    "INCLUDE_MODEL_COUNTS": False,
 }
 
 
