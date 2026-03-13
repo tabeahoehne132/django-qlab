@@ -127,32 +127,15 @@ export const API_BASE = trimTrailingSlash(
   windowBase || envBase || '/qlab/api',
 )
 
-function getCookie(name: string): string {
-  if (typeof document === 'undefined') {
-    return ''
-  }
-
-  const cookie = document.cookie
-    .split(';')
-    .map((part) => part.trim())
-    .find((part) => part.startsWith(`${name}=`))
-
-  return cookie ? decodeURIComponent(cookie.split('=').slice(1).join('=')) : ''
-}
-
 function getCsrfToken(): string {
-  const fromCookie = getCookie('csrftoken')
-  if (fromCookie) return fromCookie
-
   if (typeof window !== 'undefined') {
     return (window as Window & { __CSRF_TOKEN__?: string }).__CSRF_TOKEN__ || ''
   }
-
   return ''
 }
 
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const csrfToken = getCsrfToken()  // 👈 geändert
+  const csrfToken = getCsrfToken()
   const response = await fetch(`${API_BASE}${path}`, {
     credentials: 'include',
     headers: {
