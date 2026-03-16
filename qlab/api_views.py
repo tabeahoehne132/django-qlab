@@ -98,6 +98,7 @@ class QLabSettingsViewSet(viewsets.ViewSet):
 class SavedQueryViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = SavedQuerySerializer
+    pagination_class = None
 
     def get_queryset(self):
         return SavedQuery.objects.filter(user=self.request.user).order_by("name")
@@ -130,6 +131,7 @@ class SavedQueryViewSet(viewsets.ModelViewSet):
 class QueryRunHistoryViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = QueryRunHistorySerializer
+    pagination_class = None
 
     def get_queryset(self):
         queryset = QueryRunHistory.objects.filter(user=self.request.user)
