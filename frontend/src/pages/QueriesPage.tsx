@@ -638,6 +638,7 @@ const FilterGroupEditor: React.FC<FilterGroupEditorProps> = ({
       <button
         className="btn btn-ghost mini"
         type="button"
+        title="Add a filter condition to this group"
         onClick={() => onAddCondition(node.id)}
       >
         + Rule
@@ -645,6 +646,7 @@ const FilterGroupEditor: React.FC<FilterGroupEditorProps> = ({
       <button
         className="btn btn-ghost mini"
         type="button"
+        title="Add a nested filter group (AND / OR)"
         onClick={() => onAddGroup(node.id)}
       >
         + Group
@@ -859,6 +861,8 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
   const [saveName, setSaveName] = useState('')
   const [saveDescription, setSaveDescription] = useState('')
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle')
+  const [savedQueryId, setSavedQueryId] = useState<number | null>(null)
+  const [presetTitle, setPresetTitle] = useState<string | null>(null)
   const fieldPickerRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -896,6 +900,8 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
     }
 
     hasAppliedPreset.current = true
+    setSavedQueryId(queryPreset.saved_query_id ?? null)
+    setPresetTitle(queryPreset.title ?? null)
     setFilters(deserializeFilters(queryPreset.filter_fields, fallbackField))
     setLimit(queryPreset.page_size || defaultPageSize || 100)
     setSelectedFields(
@@ -1087,11 +1093,12 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
     filter_fields: serializeFilters(filters),
     page,
     page_size: limit,
-    title: `${activeModelLabel || activeModel} query`,
+    title: presetTitle || `${activeModelLabel || activeModel} query`,
+    ...(savedQueryId ? { saved_query_id: savedQueryId } : {}),
   })
 
   const openSaveDialog = () => {
-    setSaveName(`${activeModelLabel || activeModel} query`)
+    setSaveName(presetTitle || `${activeModelLabel || activeModel} query`)
     setSaveDescription('')
     setSaveState('idle')
     setSaveDialogOpen(true)
@@ -1204,17 +1211,14 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
     <div className="tab-panel active queries-page">
       <div className="animate-in">
         <div className="page-title-row">
-          <h1 className="page-title">
-            Q<span>Lab</span>
-          </h1>
+          <h1 className="page-title">Queries</h1>
         </div>
-        <div className="page-subtitle">dynamic · filterable · paginated</div>
       </div>
 
       <div className="card animate-in query-builder-card">
         <div className="card-header">
           <span className="card-title">
-            QLab · <span className="card-title-accent">{displayModelLabel}</span>
+            {displayModelLabel}
           </span>
         </div>
         <div className="card-body">
@@ -1311,6 +1315,7 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
           <div className="qactions">
             <button
               className="btn btn-primary"
+              title="Execute the query with the current fields and filters"
               onClick={() => void handleRunQuery({ page: 1 })}
               disabled={
                 isLoading ||
@@ -1324,6 +1329,7 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
             </button>
             <button
               className="btn btn-secondary"
+              title="Add a filter rule to the query"
               onClick={handleAddFilter}
               disabled={metadataLoading || directFieldNames.length === 0}
             >
@@ -1332,6 +1338,7 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
             {onSaveQuery && (
               <button
                 className="btn btn-secondary"
+                title="Save the current query for later reuse"
                 onClick={openSaveDialog}
                 disabled={
                   metadataLoading ||
@@ -1345,6 +1352,7 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
             {filters.children.length > 0 && (
               <button
                 className="btn btn-ghost"
+                title="Remove all active filter rules"
                 onClick={() => setFilters(newGroup(fallbackField, 'and'))}
               >
                 Clear
@@ -1373,7 +1381,7 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
           <DialogPanel className="field-picker-modal save-query-modal">
             <div className="field-picker-modal-head">
               <div>
-                <div className="field-picker-modal-kicker">Save query</div>
+                <div className="field-picker-modal-kicker">{savedQueryId ? 'Update query' : 'Save query'}</div>
                 <DialogTitle className="field-picker-modal-title">
                   {displayModelLabel}
                 </DialogTitle>
@@ -1434,10 +1442,10 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
                   }}
                 >
                   {saveState === 'saving'
-                    ? 'Saving…'
+                    ? (savedQueryId ? 'Updating…' : 'Saving…')
                     : saveState === 'saved'
-                      ? 'Saved'
-                      : 'Save Query'}
+                      ? (savedQueryId ? 'Updated' : 'Saved')
+                      : (savedQueryId ? 'Update Query' : 'Save Query')}
                 </button>
               </div>
             </div>

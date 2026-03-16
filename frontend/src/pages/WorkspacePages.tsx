@@ -51,22 +51,6 @@ interface HistoryPageProps {
   onSaveQuery: (query: HistoryItem) => Promise<void>
 }
 
-interface SettingsItem {
-  label: string
-  description: string
-  control: React.ReactNode
-}
-
-interface SettingsGroup {
-  key: string
-  title: string
-  items: SettingsItem[]
-}
-
-interface SettingsPageProps {
-  sections: SettingsGroup[]
-  activeSettingsKey: string
-}
 
 interface DocsEndpoint {
   method: 'GET' | 'POST'
@@ -295,10 +279,10 @@ const ModelInspectPanel: React.FC<ModelInspectPanelProps> = ({
     <div className={`card models-card${root ? ' root-model-card' : ' nested-model-card'} level-${level}`}>
       <div className="card-header">
         <span className="card-title">
-          <span className="card-title-accent">{root ? '▸' : '↳'}</span> {modelLabel}
+          {modelLabel}
         </span>
         <div className="card-actions-right">
-          <button className="query-hint-btn" onClick={() => onQueryModel?.(modelName)}>
+          <button className="query-hint-btn" title="Open this model in the Query Builder" onClick={() => onQueryModel?.(modelName)}>
             Query this Model →
           </button>
         </div>
@@ -366,22 +350,22 @@ const ModelInspectPanel: React.FC<ModelInspectPanelProps> = ({
                       className={`relation-row relation-toggle${isExpanded ? ' expanded' : ''}`}
                       onClick={() => void toggleRelation(relation)}
                     >
-                      <span
-                        className={
-                          relation.kind === 'fk'
-                            ? 'badge badge-fk'
-                            : relation.kind === 'm2m'
-                              ? 'badge badge-m2m'
-                              : 'badge badge-offline'
-                        }
-                      >
-                        {relation.kind === 'fk' ? 'FK →' : relation.kind === 'm2m' ? 'M2M ↔' : '← REV'}
+                                      <span className="relation-models">
+                        {modelLabel}
+                        {' '}
+                        <span
+                          className="relation-kind-arrow"
+                          title={
+                            relation.kind === 'fk'
+                              ? 'Foreign Key'
+                              : relation.kind === 'm2m'
+                                ? 'Many to Many'
+                                : 'Reverse Relation'
+                          }
+                        >→</span>
+                        {' '}
+                        {nestedLabel}
                       </span>
-                      <span className="relation-arrow">{modelLabel}</span>
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2">
-                        <path d="M5 12h14M12 5l7 7-7 7" />
-                      </svg>
-                      <span className="relation-target">{nestedLabel}</span>
                       <span className="relation-field">{relation.fieldName}</span>
                       <span className="relation-expand">{isExpanded ? '−' : '+'}</span>
                     </button>
@@ -447,9 +431,8 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({
     <div className="tab-panel active workspace-page models-page">
       <div className="animate-in">
         <div className="page-title-row">
-          <h1 className="page-title">MO<span>dels</span></h1>
+          <h1 className="page-title">Models</h1>
         </div>
-        <div className="page-subtitle">browse · inspect · relate</div>
       </div>
 
       <div className="workspace-stack models-stack animate-in">
@@ -470,16 +453,9 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({
 
 export const HistoryPage: React.FC<HistoryPageProps> = ({ historyItems, onReplayQuery, onSaveQuery }) => {
   const [search, setSearch] = React.useState('')
-  const [filter, setFilter] = React.useState<'all' | 'errors' | 'saved'>('all')
   const [selectedIds, setSelectedIds] = React.useState<Array<string | number>>([])
 
   const filteredItems = historyItems.filter((item) => {
-    if (filter === 'errors' && item.status !== 'failed') {
-      return false
-    }
-    if (filter === 'saved' && item.status !== 'cached') {
-      return false
-    }
     const query = search.trim().toLowerCase()
     if (!query) {
       return true
@@ -499,9 +475,8 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ historyItems, onReplay
     <div className="tab-panel active workspace-page">
       <div className="animate-in">
         <div className="page-title-row">
-          <h1 className="page-title">HIST<span>ory</span></h1>
+          <h1 className="page-title">History</h1>
         </div>
-        <div className="page-subtitle">recent · replay · export</div>
       </div>
 
       <div className="card animate-in history-card">
@@ -511,6 +486,7 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ historyItems, onReplay
             <div className="card-actions-right">
               <button
                 className="btn btn-secondary"
+                title="Save all selected history entries as saved queries"
                 onClick={async () => {
                   await Promise.all(
                     filteredItems
@@ -526,11 +502,6 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ historyItems, onReplay
           )}
         </div>
         <div className="card-body history-toolbar">
-          <div className="history-filters">
-            <button className={`hfilter-chip${filter === 'all' ? ' active' : ''}`} onClick={() => setFilter('all')}>All</button>
-            <button className={`hfilter-chip${filter === 'errors' ? ' active' : ''}`} onClick={() => setFilter('errors')}>Errors</button>
-            <button className={`hfilter-chip${filter === 'saved' ? ' active' : ''}`} onClick={() => setFilter('saved')}>Saved Query Runs</button>
-          </div>
           <input className="history-search" placeholder="Search history" value={search} onChange={(event) => setSearch(event.target.value)} />
         </div>
         <div className="history-list">
@@ -552,10 +523,10 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ historyItems, onReplay
                 <span className="history-duration">{item.duration}</span>
               </div>
               <div className="history-actions">
-                <button className="h-action-btn replay" onClick={() => onReplayQuery(item)}>
+                <button className="h-action-btn replay" title="Re-run this query in the Query Builder" onClick={() => onReplayQuery(item)}>
                   Replay
                 </button>
-                <button className="h-action-btn" onClick={() => void onSaveQuery(item)}>
+                <button className="h-action-btn" title="Save this query for later reuse" onClick={() => void onSaveQuery(item)}>
                   Save
                 </button>
               </div>
@@ -568,40 +539,6 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ historyItems, onReplay
   )
 }
 
-export const SettingsPage: React.FC<SettingsPageProps> = ({ sections, activeSettingsKey }) => {
-  const section = sections.find((item) => item.key === activeSettingsKey) ?? sections[0]
-
-  return (
-    <div className="tab-panel active workspace-page">
-      <div className="animate-in">
-        <div className="page-title-row">
-          <h1 className="page-title">SET<span>tings</span></h1>
-        </div>
-        <div className="page-subtitle">configure · restrict · tune</div>
-      </div>
-
-      <div className="workspace-stack animate-in saved-queries-stack">
-        <div className="card saved-queries-card settings-card">
-          <div className="card-header">
-            <span className="card-title">{section.title}</span>
-          </div>
-          <div className="card-body settings-content">
-            <div className="settings-section-title">{section.title}</div>
-            {section.items.map((item) => (
-              <div key={item.label} className="setting-row">
-                <div className="setting-info">
-                  <div className="setting-label">{item.label}</div>
-                  <div className="setting-desc">{item.description}</div>
-                </div>
-                <div className="setting-control">{item.control}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 export const DocsPage: React.FC<DocsPageProps> = ({ docs, activeDocKey }) => {
   const entry = docs.find((doc) => doc.key === activeDocKey) ?? docs[0]
@@ -610,9 +547,8 @@ export const DocsPage: React.FC<DocsPageProps> = ({ docs, activeDocKey }) => {
     <div className="tab-panel active workspace-page">
       <div className="animate-in">
         <div className="page-title-row">
-          <h1 className="page-title">DO<span>cs</span></h1>
+          <h1 className="page-title">Docs</h1>
         </div>
-        <div className="page-subtitle">reference · examples · guides</div>
       </div>
 
       <div className="workspace-stack animate-in docs-stack">
@@ -696,9 +632,8 @@ export const SavedQueriesPage: React.FC<SavedQueriesPageProps> = ({
     <div className="tab-panel active workspace-page">
       <div className="animate-in">
         <div className="page-title-row">
-          <h1 className="page-title">SAV<span>ed</span></h1>
+          <h1 className="page-title">Saved</h1>
         </div>
-        <div className="page-subtitle">store · reopen · reuse</div>
       </div>
 
       <div className="workspace-stack animate-in">
@@ -709,6 +644,7 @@ export const SavedQueriesPage: React.FC<SavedQueriesPageProps> = ({
               <div className="card-actions-right">
                 <button
                   className="btn btn-danger"
+                  title="Permanently delete all selected saved queries"
                   onClick={async () => {
                     await Promise.all(selectedIds.map((id) => onDeleteSavedQuery(id)))
                     setSelectedIds([])
@@ -766,6 +702,7 @@ export const SavedQueriesPage: React.FC<SavedQueriesPageProps> = ({
                   <div className="saved-query-actions">
                     <button
                       className="btn btn-secondary"
+                      title="Save name and description changes"
                       onClick={() => void onUpdateSavedQuery(activeQuery.id, {
                         name: activeName.trim(),
                         description: activeDescription.trim(),
@@ -773,9 +710,9 @@ export const SavedQueriesPage: React.FC<SavedQueriesPageProps> = ({
                     >
                       Update
                     </button>
-                    <button className="btn btn-ghost" onClick={() => onOpenInBuilder(activeQuery)}>Open in Builder</button>
-                    <button className="btn btn-ghost" onClick={() => void onRunSavedQuery(activeQuery)}>Run</button>
-                    <button className="btn btn-danger" onClick={() => void onDeleteSavedQuery(activeQuery.id)}>Delete</button>
+                    <button className="btn btn-ghost" title="Load this query in the Query Builder" onClick={() => onOpenInBuilder(activeQuery)}>Open in Builder</button>
+                    <button className="btn btn-ghost" title="Execute this saved query now" onClick={() => void onRunSavedQuery(activeQuery)}>Run</button>
+                    <button className="btn btn-danger" title="Permanently delete this saved query" onClick={() => void onDeleteSavedQuery(activeQuery.id)}>Delete</button>
                   </div>
                   <div className="saved-query-payload">
                     <div className="docs-h2">Payload</div>
@@ -793,4 +730,4 @@ export const SavedQueriesPage: React.FC<SavedQueriesPageProps> = ({
   )
 }
 
-export type { DocsEntry, HistoryItem, ModelDetail, SettingsGroup }
+export type { DocsEntry, HistoryItem, ModelDetail }

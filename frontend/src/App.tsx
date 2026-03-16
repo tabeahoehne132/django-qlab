@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavSidebar, TabId, ThemeMode } from './components/NavSidebar'
-import { ContentSidebar, DocsNavGroup, DocsNavItem, RecentQuery } from './components/ContentSidebar'
+import { ContentSidebar, DocsNavGroup, RecentQuery } from './components/ContentSidebar'
 import { QueriesPage } from './pages/QueriesPage'
 import {
   DocsEntry,
@@ -10,8 +10,6 @@ import {
   HistoryPage,
   ModelsPage,
   SavedQueriesPage,
-  SettingsPage,
-  SettingsGroup,
 } from './pages/WorkspacePages'
 import {
   BootstrapModel,
@@ -34,7 +32,6 @@ import {
 } from './lib/api'
 import './App.css'
 
-const SETTINGS_NAV_ITEMS: DocsNavItem[] = [{ key: 'general', label: 'General' }]
 
 const DOCS_ENTRIES: DocsEntry[] = [
   {
@@ -278,7 +275,6 @@ const getMetadataCacheKey = (modelName: string, appLabel?: string) =>
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabId>('queries')
   const [activeModel, setActiveModel] = useState<string>('')
-  const [activeSettingsKey, setActiveSettingsKey] = useState<string>('general')
   const [activeDocsKey, setActiveDocsKey] = useState<string>('overview')
   const [theme, setTheme] = useState<ThemeMode>(() => {
     if (typeof window === 'undefined') return 'dark'
@@ -313,7 +309,6 @@ export default function App() {
       case 'models':
       case 'saved':
       case 'history':
-      case 'settings':
       case 'docs':
       case 'queries':
         return tab
@@ -354,7 +349,6 @@ export default function App() {
         setActiveModel(bootstrap.models[0]?.model_name || '')
         setActiveTab(normalizeTab(bootstrap.settings.last_active_tab))
         setActiveDocsKey(bootstrap.settings.active_docs_key || 'overview')
-        setActiveSettingsKey(bootstrap.settings.active_settings_key || 'general')
         setDefaultPageSize(bootstrap.settings.default_page_size || 100)
         setTheme(bootstrap.settings.theme || 'dark')
         setFavoriteModels(
@@ -396,7 +390,6 @@ export default function App() {
         default_page_size: defaultPageSize,
         last_active_tab: activeTab,
         active_docs_key: activeDocsKey,
-        active_settings_key: activeSettingsKey,
         ui_state: {
           favorite_models: favoriteModels,
           recent_models: recentModelNames,
@@ -407,7 +400,6 @@ export default function App() {
     return () => window.clearTimeout(timeoutId)
   }, [
     activeDocsKey,
-    activeSettingsKey,
     activeTab,
     defaultPageSize,
     favoriteModels,
@@ -661,35 +653,6 @@ export default function App() {
     return true
   })
 
-  const settingsSections: SettingsGroup[] = [
-    {
-      key: 'general',
-      title: 'General',
-      items: [
-        {
-          label: 'Theme',
-          description: 'Default UI theme persisted for the current user.',
-          control: (
-            <select className="setting-select" value={theme} onChange={(event) => setTheme(event.target.value as ThemeMode)}>
-              <option value="dark">Dark</option>
-              <option value="light">Light</option>
-            </select>
-          ),
-        },
-        {
-          label: 'Default page size',
-          description: 'Managed by the host application.',
-          control: <span className="setting-readonly">{defaultPageSize}</span>,
-        },
-        {
-          label: 'Environment badge',
-          description: 'Managed by the host application.',
-          control: <span className="setting-readonly">Local</span>,
-        },
-      ],
-    },
-  ]
-
   if (isBootstrapping) {
     return <div className="app-screen"><div className="app-screen-panel"><strong>Loading QLab</strong><span>Bootstrapping models, settings and saved query state.</span></div></div>
   }
@@ -720,9 +683,6 @@ export default function App() {
         onHistoryModelSelect={setActiveHistoryModel}
         activeHistoryRange={activeHistoryRange}
         onHistoryRangeSelect={setActiveHistoryRange}
-        settingsItems={SETTINGS_NAV_ITEMS}
-        activeSettingsKey={activeSettingsKey}
-        onSettingsSelect={setActiveSettingsKey}
         docsGroups={DOCS_GROUPS}
         activeDocsKey={activeDocsKey}
         onDocsSelect={setActiveDocsKey}
@@ -759,17 +719,27 @@ export default function App() {
                 onRequestMetadata={loadMetadata}
                 onSaveQuery={async ({ name, description, payload }) => {
               try {
-                const created = await createSavedQuery({
-                  name,
-                  description,
-                  app_label: activeModelEntry?.app_label || '',
-                  model_name: payload.model,
-                  query_payload: payload as unknown as Record<string, unknown>,
-                  tags: [],
-                  is_shared: false,
-                })
-                syncSavedQuery(created)
-                pushToast('success', `Saved query "${created.name}".`)
+                if (payload.saved_query_id) {
+                  const updated = await updateSavedQuery(payload.saved_query_id, {
+                    name,
+                    description,
+                    query_payload: payload as unknown as Record<string, unknown>,
+                  })
+                  syncSavedQuery(updated)
+                  pushToast('success', `Updated query "${updated.name}".`)
+                } else {
+                  const created = await createSavedQuery({
+                    name,
+                    description,
+                    app_label: activeModelEntry?.app_label || '',
+                    model_name: payload.model,
+                    query_payload: payload as unknown as Record<string, unknown>,
+                    tags: [],
+                    is_shared: false,
+                  })
+                  syncSavedQuery(created)
+                  pushToast('success', `Saved query "${created.name}".`)
+                }
               } catch (error) {
                 pushToast('error', error instanceof Error ? error.message : 'Could not save query.')
                 throw error
@@ -866,9 +836,6 @@ export default function App() {
               }
             }}
           />
-        )}
-        {activeTab === 'settings' && (
-          <SettingsPage sections={settingsSections} activeSettingsKey={activeSettingsKey} />
         )}
         {activeTab === 'docs' && (
           <DocsPage docs={DOCS_ENTRIES} activeDocKey={activeDocsKey} />

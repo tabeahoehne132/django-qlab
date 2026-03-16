@@ -75,8 +75,8 @@ body {
 /* ============================
    SHARED COMPONENTS
    ============================ */
-.page-title-row { display: flex; align-items: baseline; gap: 10px; margin-bottom: 2px; }
-.page-title { font-family: 'Bebas Neue', sans-serif; font-size: 1.5rem; letter-spacing: 0.1em; color: var(--text); line-height: 1; }
+.page-title-row { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+.page-title { font-family: 'Bebas Neue', sans-serif; font-size: 1.0rem; letter-spacing: 0.08em; color: var(--text); line-height: 1; }
 .page-title span { color: var(--accent); }
 .page-subtitle { font-family: 'IBM Plex Mono', monospace; font-size: 0.62rem; color: var(--muted); letter-spacing: 0.06em; }
 

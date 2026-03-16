@@ -54,9 +54,6 @@ interface ContentSidebarProps {
   onHistoryModelSelect?: (model: string) => void
   activeHistoryRange?: 'all' | 'today' | '7d' | '30d'
   onHistoryRangeSelect?: (range: 'all' | 'today' | '7d' | '30d') => void
-  settingsItems?: DocsNavItem[]
-  activeSettingsKey?: string
-  onSettingsSelect?: (key: string) => void
   docsGroups?: DocsNavGroup[]
   activeDocsKey?: string
   onDocsSelect?: (key: string) => void
@@ -148,9 +145,6 @@ export const ContentSidebar: React.FC<ContentSidebarProps> = ({
   onHistoryModelSelect,
   activeHistoryRange,
   onHistoryRangeSelect,
-  settingsItems = [],
-  activeSettingsKey,
-  onSettingsSelect,
   docsGroups = [],
   activeDocsKey,
   onDocsSelect,
@@ -207,14 +201,6 @@ export const ContentSidebar: React.FC<ContentSidebarProps> = ({
           onSelectModel={onHistoryModelSelect}
           activeRange={activeHistoryRange || 'all'}
           onSelectRange={onHistoryRangeSelect}
-        />
-      )}
-
-      {activeTab === 'settings' && (
-        <SettingsSidebarPanel
-          items={settingsItems}
-          activeKey={activeSettingsKey}
-          onSelect={onSettingsSelect}
         />
       )}
 
@@ -446,43 +432,9 @@ const SavedSidebarPanel: React.FC<{
         ))}
       </div>
     </div>
-    <div className="csidebar-footer">
-      <div className="info-box">
-        <strong>Tip</strong>
-        Save useful builder states here and reopen them in one click.
-      </div>
-    </div>
   </div>
 )
 
-const SettingsSidebarPanel: React.FC<{
-  items: DocsNavItem[]
-  activeKey?: string
-  onSelect?: (key: string) => void
-}> = ({ items, activeKey, onSelect }) => (
-  <div className="sidebar-panel active">
-    <div className="csidebar-body">
-      <div>
-        <div className="sidebar-label">Settings</div>
-        {items.map((item) => (
-          <div
-            key={item.key}
-            className={`res-item${activeKey === item.key ? ' active' : ''}`}
-            onClick={() => onSelect?.(item.key)}
-          >
-            <span className="res-name">{item.label}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-    <div className="csidebar-footer">
-      <div className="info-box">
-        <strong>v0.1.0</strong>
-        django-qlab · MIT License
-      </div>
-    </div>
-  </div>
-)
 
 const DocsSidebarPanel: React.FC<{
   groups: DocsNavGroup[]
