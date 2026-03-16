@@ -1,10 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react'
 import {
-  Dialog,
-  DialogPanel,
-  DialogTitle,
-} from '@headlessui/react'
-import {
+  MetadataField,
+  MetadataResponse,
   QueryCondition,
   QueryFilterGroup,
   QueryRequest,
@@ -38,37 +36,131 @@ interface ResultRow {
 
 type ResultTab = 'table' | 'json'
 
+interface FieldSuggestion {
+  path: string
+  label: string
+  displayLabel: string
+  type: string
+  isRelation: boolean
+  relatedModel?: string | null
+  relatedAppLabel?: string | null
+}
+
+interface FieldResolution {
+  suggestions: FieldSuggestion[]
+  exactMatch: FieldSuggestion | null
+  error: string | null
+}
+
+interface FieldAutocompleteProps {
+  value: string
+  rootModel: string
+  rootAppLabel?: string
+  rootMetadata?: MetadataResponse
+  placeholder?: string
+  className?: string
+  autoFocus?: boolean
+  compact?: boolean
+  onChange: (value: string) => void
+  onRequestMetadata: (modelName: string, appLabel?: string) => Promise<MetadataResponse>
+  onSubmit?: (value: string) => void
+}
+
+const RELATION_TYPES = new Set([
+  'foreignkey',
+  'onetoone',
+  'manytomany',
+  'reverse_relation',
+])
+
+const DEFAULT_OPERATIONS: FilterOp[] = [
+  'is',
+  'is_not',
+  'icontains',
+  'lt',
+  'lte',
+  'gt',
+  'gte',
+]
+
+const splitIdentifier = (value: string) =>
+  value
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/_/g, ' ')
+    .trim()
+
+const normalizeDisplayLabel = (label: string, fieldName: string) => {
+  const normalizedLabel = label.trim().toLowerCase()
+  const normalizedField = splitIdentifier(fieldName).trim().toLowerCase()
+  return normalizedLabel === normalizedField ? splitIdentifier(fieldName) : label
+}
+
 const IconPlay = () => (
-  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polygon points="5 3 19 12 5 21 5 3"/>
+  <svg
+    width="12"
+    height="12"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <polygon points="5 3 19 12 5 21 5 3" />
   </svg>
 )
 
 const IconPlus = () => (
-  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+  <svg
+    width="12"
+    height="12"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <line x1="12" y1="5" x2="12" y2="19" />
+    <line x1="5" y1="12" x2="19" y2="12" />
   </svg>
 )
 
 const IconCopy = () => (
-  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+  <svg
+    width="12"
+    height="12"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.75"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
   </svg>
 )
 
 const IconDownload = () => (
-  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-    <polyline points="7 10 12 15 17 10"/>
-    <line x1="12" y1="15" x2="12" y2="3"/>
+  <svg
+    width="12"
+    height="12"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.75"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <polyline points="7 10 12 15 17 10" />
+    <line x1="12" y1="15" x2="12" y2="3" />
   </svg>
 )
 
 let idCounter = 0
 const newId = () => `filter-${++idCounter}`
-
-const DEFAULT_OPERATIONS: FilterOp[] = ['is', 'is_not', 'icontains', 'lt', 'lte', 'gt', 'gte']
 
 function newCondition(fallbackField: string): FilterConditionNode {
   return {
@@ -150,7 +242,9 @@ function deserializeFilters(
         id: newId(),
         type: 'group',
         operator: 'or',
-        children: node.or_operation.map((child) => walk(child as QueryFilterGroup | QueryCondition)),
+        children: node.or_operation.map((child) =>
+          walk(child as QueryFilterGroup | QueryCondition),
+        ),
       }
     }
 
@@ -158,25 +252,120 @@ function deserializeFilters(
       id: newId(),
       type: 'group',
       operator: 'and',
-      children: (node.and_operation || []).map((child) => walk(child as QueryFilterGroup | QueryCondition)),
+      children: (node.and_operation || []).map((child) =>
+        walk(child as QueryFilterGroup | QueryCondition),
+      ),
     }
   }
 
   const result = walk(filterGroup)
-  return result.type === 'group' ? result : {
-    id: newId(),
-    type: 'group',
-    operator: 'and',
-    children: [result],
+  return result.type === 'group'
+    ? result
+    : {
+        id: newId(),
+        type: 'group',
+        operator: 'and',
+        children: [result],
+      }
+}
+
+function getDirectFields(metadata?: MetadataResponse): MetadataField[] {
+  return metadata ? metadata.fields.filter((field) => !field.name.includes('__')) : []
+}
+
+function isRelationField(field: MetadataField) {
+  return RELATION_TYPES.has(field.type) && Boolean(field.related_model)
+}
+
+async function resolveFieldPath(
+  query: string,
+  rootModel: string,
+  rootAppLabel: string | undefined,
+  rootMetadata: MetadataResponse | undefined,
+  onRequestMetadata: (modelName: string, appLabel?: string) => Promise<MetadataResponse>,
+): Promise<FieldResolution> {
+  const normalized = query.trim()
+  const endsWithPathSeparator = normalized.endsWith('__')
+  const segments = normalized.split('__').filter(Boolean)
+
+  let currentModel = rootModel
+  let currentAppLabel = rootAppLabel
+  let currentMetadata =
+    rootMetadata || (await onRequestMetadata(rootModel, rootAppLabel))
+  const traversedSegments: string[] = []
+
+  const relationSegments = endsWithPathSeparator ? segments : segments.slice(0, -1)
+  const partial = endsWithPathSeparator ? '' : segments[segments.length - 1] || ''
+
+  for (const segment of relationSegments) {
+    const relationField = getDirectFields(currentMetadata).find(
+      (field) => field.name === segment && isRelationField(field),
+    )
+
+    if (!relationField || !relationField.related_model) {
+      return {
+        suggestions: [],
+        exactMatch: null,
+        error: 'Unknown relation path.',
+      }
+    }
+
+    traversedSegments.push(segment)
+    currentModel = relationField.related_model
+    currentAppLabel = relationField.related_app_label || currentAppLabel
+    currentMetadata = await onRequestMetadata(currentModel, currentAppLabel)
+  }
+
+  const directFields = getDirectFields(currentMetadata)
+  const exactField = !endsWithPathSeparator
+    ? directFields.find((field) => field.name === partial)
+    : null
+
+  const suggestions = directFields
+    .filter((field) => {
+      if (!partial) {
+        return true
+      }
+      const needle = partial.toLowerCase()
+      return (
+        field.name.toLowerCase().includes(needle) ||
+        field.label.toLowerCase().includes(needle)
+      )
+    })
+    .map((field) => ({
+      path: [...traversedSegments, field.name].join('__'),
+      label: field.label || field.name,
+      displayLabel: normalizeDisplayLabel(field.label || field.name, field.name),
+      type: field.type,
+      isRelation: isRelationField(field),
+      relatedModel: field.related_model,
+      relatedAppLabel: field.related_app_label,
+    }))
+
+  return {
+    suggestions,
+    exactMatch: exactField
+      ? {
+          path: [...traversedSegments, exactField.name].join('__'),
+          label: exactField.label || exactField.name,
+          displayLabel: normalizeDisplayLabel(
+            exactField.label || exactField.name,
+            exactField.name,
+          ),
+          type: exactField.type,
+          isRelation: isRelationField(exactField),
+          relatedModel: exactField.related_model,
+          relatedAppLabel: exactField.related_app_label,
+        }
+      : null,
+    error: null,
   }
 }
 
-interface ResourceRowProps {
+const ResourceRow: React.FC<{
   activeModel: string
   activeModelLabel?: string
-}
-
-const ResourceRow: React.FC<ResourceRowProps> = ({ activeModel, activeModelLabel }) => (
+}> = ({ activeModel, activeModelLabel }) => (
   <div className="resource-row">
     <span className="from-label">FROM</span>
     <div className="resource-current">
@@ -188,45 +377,187 @@ const ResourceRow: React.FC<ResourceRowProps> = ({ activeModel, activeModelLabel
   </div>
 )
 
+const FieldAutocomplete: React.FC<FieldAutocompleteProps> = ({
+  value,
+  rootModel,
+  rootAppLabel,
+  rootMetadata,
+  placeholder = 'Search field',
+  className = '',
+  autoFocus = false,
+  compact = false,
+  onChange,
+  onRequestMetadata,
+  onSubmit,
+}) => {
+  const [query, setQuery] = useState(value)
+  const [open, setOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [resolution, setResolution] = useState<FieldResolution>({
+    suggestions: [],
+    exactMatch: null,
+    error: null,
+  })
+  const closeTimeout = useRef<number | null>(null)
+
+  useEffect(() => {
+    setQuery(value)
+  }, [value])
+
+  useEffect(() => {
+    let active = true
+
+    const load = async () => {
+      setLoading(true)
+      try {
+        const nextResolution = await resolveFieldPath(
+          query,
+          rootModel,
+          rootAppLabel,
+          rootMetadata,
+          onRequestMetadata,
+        )
+        if (active) {
+          setResolution(nextResolution)
+        }
+      } catch {
+        if (active) {
+          setResolution({
+            suggestions: [],
+            exactMatch: null,
+            error: 'Could not load relation metadata.',
+          })
+        }
+      } finally {
+        if (active) {
+          setLoading(false)
+        }
+      }
+    }
+
+    if (!rootModel) {
+      setResolution({ suggestions: [], exactMatch: null, error: null })
+      return () => {
+        active = false
+      }
+    }
+
+    void load()
+    return () => {
+      active = false
+    }
+  }, [onRequestMetadata, query, rootAppLabel, rootMetadata, rootModel])
+
+  const clearCloseTimer = () => {
+    if (closeTimeout.current) {
+      window.clearTimeout(closeTimeout.current)
+      closeTimeout.current = null
+    }
+  }
+
+  const handleSuggestionClick = (suggestion: FieldSuggestion) => {
+    if (suggestion.isRelation) {
+      const nextPath = `${suggestion.path}__`
+      setQuery(nextPath)
+      onChange(nextPath)
+      setOpen(true)
+      return
+    }
+
+    setQuery(suggestion.path)
+    onChange(suggestion.path)
+    setOpen(false)
+    onSubmit?.(suggestion.path)
+  }
+
+  return (
+    <div
+      className={`field-autocomplete${compact ? ' compact' : ''}${className ? ` ${className}` : ''}`}
+      onFocus={() => {
+        clearCloseTimer()
+        setOpen(true)
+      }}
+      onBlur={() => {
+        closeTimeout.current = window.setTimeout(() => setOpen(false), 120)
+      }}
+    >
+      <input
+        className="field-autocomplete-input"
+        value={query}
+        placeholder={placeholder}
+        autoFocus={autoFocus}
+        onChange={(event) => {
+          const nextValue = event.target.value
+          setQuery(nextValue)
+          onChange(nextValue)
+          setOpen(true)
+        }}
+      />
+
+      {open && (
+        <div className="field-autocomplete-menu">
+          {loading && <div className="field-picker-empty">Loading fields…</div>}
+          {!loading && resolution.error && (
+            <div className="field-picker-empty">{resolution.error}</div>
+          )}
+          {!loading && !resolution.error && resolution.suggestions.length === 0 && (
+            <div className="field-picker-empty">No matching fields.</div>
+          )}
+          {!loading && !resolution.error && resolution.suggestions.map((suggestion) => (
+            <button
+              key={suggestion.path}
+              type="button"
+              className="field-picker-item"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => handleSuggestionClick(suggestion)}
+            >
+              <span className="field-picker-item-path">{suggestion.path}</span>
+              {(suggestion.isRelation ||
+                suggestion.displayLabel.trim().toLowerCase() !==
+                  suggestion.path.replace(/__/g, ' ').trim().toLowerCase()) && (
+                <span className="field-picker-item-meta">
+                  {suggestion.isRelation
+                    ? `Relation → ${suggestion.relatedModel}`
+                    : suggestion.displayLabel}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 interface ConditionRowProps {
   node: FilterConditionNode
+  rootModel: string
+  rootAppLabel?: string
+  rootMetadata?: MetadataResponse
   onChange: (id: string, patch: Partial<FilterConditionNode>) => void
   onRemove: (id: string) => void
-  onOpenFieldDialog: (id: string) => void
+  onRequestMetadata: (modelName: string, appLabel?: string) => Promise<MetadataResponse>
 }
 
-interface FieldPickerTriggerProps {
-  label: string
-  active?: boolean
-  disabled?: boolean
-  className?: string
-  onClick: () => void
-}
-
-const FieldPickerTrigger: React.FC<FieldPickerTriggerProps> = ({
-  label,
-  active = false,
-  disabled = false,
-  className = '',
-  onClick,
+const ConditionRow: React.FC<ConditionRowProps> = ({
+  node,
+  rootModel,
+  rootAppLabel,
+  rootMetadata,
+  onChange,
+  onRemove,
+  onRequestMetadata,
 }) => (
-  <button
-    type="button"
-    className={`resource-chip field-picker-trigger${active ? ' active' : ' add'}${className ? ` ${className}` : ''}`}
-    disabled={disabled}
-    onClick={onClick}
-  >
-    {label}
-  </button>
-)
-
-const ConditionRow: React.FC<ConditionRowProps> = ({ node, onChange, onRemove, onOpenFieldDialog }) => (
   <div className="filter-row">
-    <FieldPickerTrigger
-      label={node.field || '+ Choose Field'}
-      active={Boolean(node.field)}
-      className="field-trigger"
-      onClick={() => onOpenFieldDialog(node.id)}
+    <FieldAutocomplete
+      value={node.field}
+      rootModel={rootModel}
+      rootAppLabel={rootAppLabel}
+      rootMetadata={rootMetadata}
+      onChange={(field) => onChange(node.id, { field })}
+      onRequestMetadata={onRequestMetadata}
+      className="filter-field-autocomplete"
+      compact
     />
 
     <select
@@ -249,7 +580,14 @@ const ConditionRow: React.FC<ConditionRowProps> = ({ node, onChange, onRemove, o
       onChange={(event) => onChange(node.id, { value: event.target.value })}
     />
 
-    <button className="remove-btn" onClick={() => onRemove(node.id)} title="Remove filter">×</button>
+    <button
+      className="remove-btn"
+      type="button"
+      onClick={() => onRemove(node.id)}
+      title="Remove filter"
+    >
+      ×
+    </button>
   </div>
 )
 
@@ -257,28 +595,32 @@ interface FilterGroupEditorProps {
   node: FilterGroupNode
   depth?: number
   isRoot?: boolean
-  fields: string[]
   fallbackField: string
+  rootModel: string
+  rootAppLabel?: string
+  rootMetadata?: MetadataResponse
   onUpdateGroup: (id: string, patch: Partial<FilterGroupNode>) => void
   onUpdateCondition: (id: string, patch: Partial<FilterConditionNode>) => void
   onAddCondition: (groupId: string) => void
   onAddGroup: (groupId: string) => void
   onRemoveNode: (id: string) => void
-  onOpenFieldDialog: (id: string) => void
+  onRequestMetadata: (modelName: string, appLabel?: string) => Promise<MetadataResponse>
 }
 
 const FilterGroupEditor: React.FC<FilterGroupEditorProps> = ({
   node,
   depth = 0,
   isRoot = false,
-  fields,
   fallbackField,
+  rootModel,
+  rootAppLabel,
+  rootMetadata,
   onUpdateGroup,
   onUpdateCondition,
   onAddCondition,
   onAddGroup,
   onRemoveNode,
-  onOpenFieldDialog,
+  onRequestMetadata,
 }) => (
   <div className={`filter-group depth-${depth}`}>
     <div className="filter-group-head">
@@ -286,19 +628,34 @@ const FilterGroupEditor: React.FC<FilterGroupEditorProps> = ({
       <select
         className="filter-group-operator"
         value={node.operator}
-        onChange={(event) => onUpdateGroup(node.id, { operator: event.target.value as FilterJoiner })}
+        onChange={(event) =>
+          onUpdateGroup(node.id, { operator: event.target.value as FilterJoiner })
+        }
       >
         <option value="and">AND</option>
         <option value="or">OR</option>
       </select>
-      <button className="btn btn-ghost mini" type="button" onClick={() => onAddCondition(node.id)}>
+      <button
+        className="btn btn-ghost mini"
+        type="button"
+        onClick={() => onAddCondition(node.id)}
+      >
         + Rule
       </button>
-      <button className="btn btn-ghost mini" type="button" onClick={() => onAddGroup(node.id)}>
+      <button
+        className="btn btn-ghost mini"
+        type="button"
+        onClick={() => onAddGroup(node.id)}
+      >
         + Group
       </button>
       {!isRoot && (
-        <button className="remove-btn" type="button" onClick={() => onRemoveNode(node.id)} title="Remove group">
+        <button
+          className="remove-btn"
+          type="button"
+          onClick={() => onRemoveNode(node.id)}
+          title="Remove group"
+        >
           ×
         </button>
       )}
@@ -307,33 +664,42 @@ const FilterGroupEditor: React.FC<FilterGroupEditorProps> = ({
       {node.children.length === 0 && (
         <div className="field-hint">No rules in this group.</div>
       )}
-      {node.children.map((child) => (
+      {node.children.map((child) =>
         child.type === 'group' ? (
           <FilterGroupEditor
             key={child.id}
             node={child}
             depth={depth + 1}
-            fields={fields}
             fallbackField={fallbackField}
+            rootModel={rootModel}
+            rootAppLabel={rootAppLabel}
+            rootMetadata={rootMetadata}
             onUpdateGroup={onUpdateGroup}
             onUpdateCondition={onUpdateCondition}
             onAddCondition={onAddCondition}
             onAddGroup={onAddGroup}
             onRemoveNode={onRemoveNode}
-            onOpenFieldDialog={onOpenFieldDialog}
+            onRequestMetadata={onRequestMetadata}
           />
         ) : (
           <ConditionRow
             key={child.id}
             node={child}
+            rootModel={rootModel}
+            rootAppLabel={rootAppLabel}
+            rootMetadata={rootMetadata}
             onChange={onUpdateCondition}
             onRemove={onRemoveNode}
-            onOpenFieldDialog={onOpenFieldDialog}
+            onRequestMetadata={onRequestMetadata}
           />
-        )
-      ))}
+        ),
+      )}
       {node.children.length === 0 && fallbackField && (
-        <button className="btn btn-ghost mini" type="button" onClick={() => onAddCondition(node.id)}>
+        <button
+          className="btn btn-ghost mini"
+          type="button"
+          onClick={() => onAddCondition(node.id)}
+        >
           Add first rule
         </button>
       )}
@@ -341,23 +707,14 @@ const FilterGroupEditor: React.FC<FilterGroupEditorProps> = ({
   </div>
 )
 
-interface ResultsTableProps {
+const ResultsTable: React.FC<{
   rows: ResultRow[]
   selectedRow: number | null
   onRowSelect: (index: number) => void
   sortField: string
   sortDir: 'asc' | 'desc'
   onSort: (field: string) => void
-}
-
-const ResultsTable: React.FC<ResultsTableProps> = ({
-  rows,
-  selectedRow,
-  onRowSelect,
-  sortField,
-  sortDir,
-  onSort,
-}) => {
+}> = ({ rows, selectedRow, onRowSelect, sortField, sortDir, onSort }) => {
   if (rows.length === 0) {
     return <div className="empty-state">No results</div>
   }
@@ -388,7 +745,16 @@ const ResultsTable: React.FC<ResultsTableProps> = ({
               onClick={() => onRowSelect(index)}
             >
               {columns.map((column) => (
-                <td key={column} className={column === 'id' ? 'td-id' : column === 'name' ? 'td-name' : 'td-plain'}>
+                <td
+                  key={column}
+                  className={
+                    column === 'id'
+                      ? 'td-id'
+                      : column === 'name'
+                        ? 'td-name'
+                        : 'td-plain'
+                  }
+                >
                   {String(row[column] ?? '')}
                 </td>
               ))}
@@ -404,7 +770,7 @@ interface QueriesPageProps {
   activeModel: string
   activeModelLabel?: string
   activeAppLabel?: string
-  fieldOptions: string[]
+  activeMetadata?: MetadataResponse
   metadataLoading?: boolean
   defaultPageSize: number
   queryPreset?: QueryRequest | null
@@ -416,19 +782,15 @@ interface QueriesPageProps {
     description: string
     payload: QueryRequest
   }) => Promise<void>
+  onRequestMetadata: (modelName: string, appLabel?: string) => Promise<MetadataResponse>
   onRunQuery: (payload: QueryRequest) => Promise<QueryResponse>
 }
-
-type FieldDialogState =
-  | { type: 'select' }
-  | { type: 'filter'; conditionId: string }
-  | null
 
 export const QueriesPage: React.FC<QueriesPageProps> = ({
   activeModel,
   activeModelLabel,
   activeAppLabel,
-  fieldOptions,
+  activeMetadata,
   metadataLoading = false,
   defaultPageSize,
   queryPreset,
@@ -436,14 +798,22 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
   onPresetApplied,
   onResultsPresetApplied,
   onSaveQuery,
+  onRequestMetadata,
   onRunQuery,
 }) => {
-  const fallbackField = fieldOptions[0] || 'id'
+  const directFields = useMemo(() => getDirectFields(activeMetadata), [activeMetadata])
+  const directFieldNames = useMemo(
+    () => directFields.map((field) => field.name),
+    [directFields],
+  )
+  const validLookupNames = useMemo(
+    () => new Set(activeMetadata?.all_lookups || directFieldNames),
+    [activeMetadata, directFieldNames],
+  )
+  const fallbackField = directFieldNames[0] || 'id'
   const hasAppliedPreset = useRef(false)
 
-  const [filters, setFilters] = useState<FilterGroupNode>(
-    newGroup(fallbackField, 'and'),
-  )
+  const [filters, setFilters] = useState<FilterGroupNode>(newGroup(fallbackField, 'and'))
   const [limit, setLimit] = useState(defaultPageSize || 100)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -453,52 +823,44 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [results, setResults] = useState<QueryResponse | null>(null)
   const [selectedFields, setSelectedFields] = useState<string[]>([])
+  const [isFieldPickerOpen, setIsFieldPickerOpen] = useState(false)
   const [fieldSearch, setFieldSearch] = useState('')
-  const [fieldDialog, setFieldDialog] = useState<FieldDialogState>(null)
   const [copyState, setCopyState] = useState<'idle' | 'done' | 'error'>('idle')
   const [csvState, setCsvState] = useState<'idle' | 'done'>('idle')
   const [saveDialogOpen, setSaveDialogOpen] = useState(false)
   const [saveName, setSaveName] = useState('')
   const [saveDescription, setSaveDescription] = useState('')
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle')
-
-  const closeFieldDialog = () => {
-    setFieldSearch('')
-    setFieldDialog(null)
-  }
+  const fieldPickerRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
-    if (!fieldOptions.length) {
+    if (!directFieldNames.length) {
       setFilters(newGroup('', 'and'))
       setSelectedFields([])
-      closeFieldDialog()
       return
     }
 
     setSelectedFields((current) => {
-      const next = current.filter((field) => fieldOptions.includes(field))
+      const next = current.filter((field) => validLookupNames.has(field))
       if (next.length > 0) {
         return next
       }
-      return fieldOptions.slice(0, Math.min(fieldOptions.length, 5))
+      return directFieldNames.slice(0, Math.min(directFieldNames.length, 5))
     })
 
     setFilters((current) => {
       const normalizeNode = (node: FilterNode): FilterNode => {
         if (node.type === 'group') {
-          return {
-            ...node,
-            children: node.children.map((child) => normalizeNode(child)),
-          }
+          return { ...node, children: node.children.map((child) => normalizeNode(child)) }
         }
         return {
           ...node,
-          field: fieldOptions.includes(node.field) ? node.field : fallbackField,
+          field: node.field && validLookupNames.has(node.field) ? node.field : fallbackField,
         }
       }
       return normalizeNode(current) as FilterGroupNode
     })
-  }, [activeModel, fallbackField, fieldOptions])
+  }, [activeModel, directFieldNames, fallbackField, validLookupNames])
 
   useEffect(() => {
     if (!queryPreset || hasAppliedPreset.current) {
@@ -508,7 +870,12 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
     hasAppliedPreset.current = true
     setFilters(deserializeFilters(queryPreset.filter_fields, fallbackField))
     setLimit(queryPreset.page_size || defaultPageSize || 100)
-    setSelectedFields(queryPreset.select_fields || fieldOptions.slice(0, Math.min(fieldOptions.length, 5)))
+    setSelectedFields(
+      queryPreset.select_fields?.length
+        ? queryPreset.select_fields
+        : directFieldNames.slice(0, Math.min(directFieldNames.length, 5)),
+    )
+
     if (resultsPreset) {
       setResults(resultsPreset)
       setSelectedRow(null)
@@ -526,30 +893,40 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
       onPresetApplied?.()
       hasAppliedPreset.current = false
     })
-  }, [defaultPageSize, fallbackField, onPresetApplied, onResultsPresetApplied, queryPreset, resultsPreset])
+  }, [
+    defaultPageSize,
+    directFieldNames,
+    fallbackField,
+    onPresetApplied,
+    onResultsPresetApplied,
+    queryPreset,
+    resultsPreset,
+  ])
 
   useEffect(() => {
-    if (!fieldDialog) {
+    if (!isFieldPickerOpen) {
       return
     }
 
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        closeFieldDialog()
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!fieldPickerRef.current?.contains(event.target as Node)) {
+        setIsFieldPickerOpen(false)
       }
     }
 
-    document.addEventListener('keydown', handleEscape)
-    return () => {
-      document.removeEventListener('keydown', handleEscape)
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsFieldPickerOpen(false)
+      }
     }
-  }, [fieldDialog])
 
-  useEffect(() => {
-    if (!fieldDialog) {
-      setFieldSearch('')
+    window.addEventListener('pointerdown', handlePointerDown)
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('pointerdown', handlePointerDown)
+      window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [fieldDialog])
+  }, [isFieldPickerOpen])
 
   const updateNode = (
     node: FilterNode,
@@ -585,10 +962,7 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
 
   const appendToGroup = (node: FilterNode, groupId: string, child: FilterNode): FilterNode => {
     if (node.type === 'group' && node.id === groupId) {
-      return {
-        ...node,
-        children: [...node.children, child],
-      }
+      return { ...node, children: [...node.children, child] }
     }
     if (node.type === 'group') {
       return {
@@ -607,29 +981,37 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
   }
 
   const handleConditionChange = (id: string, patch: Partial<FilterConditionNode>) => {
-    setFilters((current) => updateNode(current, id, (node) => (
-      node.type === 'condition' ? { ...node, ...patch } : node
-    )) as FilterGroupNode)
+    setFilters((current) =>
+      updateNode(current, id, (node) =>
+        node.type === 'condition' ? { ...node, ...patch } : node,
+      ) as FilterGroupNode,
+    )
   }
 
   const handleGroupChange = (id: string, patch: Partial<FilterGroupNode>) => {
-    setFilters((current) => updateNode(current, id, (node) => (
-      node.type === 'group' ? { ...node, ...patch } : node
-    )) as FilterGroupNode)
+    setFilters((current) =>
+      updateNode(current, id, (node) =>
+        node.type === 'group' ? { ...node, ...patch } : node,
+      ) as FilterGroupNode,
+    )
   }
 
   const handleAddConditionToGroup = (groupId: string) => {
     if (!fallbackField) {
       return
     }
-    setFilters((current) => appendToGroup(current, groupId, newCondition(fallbackField)) as FilterGroupNode)
+    setFilters((current) =>
+      appendToGroup(current, groupId, newCondition(fallbackField)) as FilterGroupNode,
+    )
   }
 
   const handleAddGroupToGroup = (groupId: string) => {
     if (!fallbackField) {
       return
     }
-    setFilters((current) => appendToGroup(current, groupId, newGroup(fallbackField, 'and')) as FilterGroupNode)
+    setFilters((current) =>
+      appendToGroup(current, groupId, newGroup(fallbackField, 'and')) as FilterGroupNode,
+    )
   }
 
   const handleRemoveFilterNode = (id: string) => {
@@ -648,11 +1030,8 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
     })
   }
 
-  const availableFields = fieldOptions.filter((field) => !selectedFields.includes(field))
-  const fieldDialogOptions = fieldDialog?.type === 'select' ? availableFields : fieldOptions
-  const matchingFields = fieldDialogOptions.filter((field) => (
-    field.toLowerCase().includes(fieldSearch.trim().toLowerCase())
-  ))
+  const availableFields = selectedFields.length < validLookupNames.size
+
   const hasIncompleteFilters = useMemo(() => {
     const walk = (node: FilterNode): boolean => {
       if (node.type === 'condition') {
@@ -666,24 +1045,22 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
 
   const handleSort = (field: string) => {
     if (sortField === field) {
-      setSortDir((current) => current === 'asc' ? 'desc' : 'asc')
+      setSortDir((current) => (current === 'asc' ? 'desc' : 'asc'))
       return
     }
     setSortField(field)
     setSortDir('asc')
   }
 
-  const buildPayload = (page: number): QueryRequest => {
-    return {
-      model: activeModel,
-      ...(activeAppLabel ? { app_label: activeAppLabel } : {}),
-      select_fields: selectedFields.length > 0 ? selectedFields : ['id'],
-      filter_fields: serializeFilters(filters),
-      page,
-      page_size: limit,
-      title: `${activeModelLabel || activeModel} query`,
-    }
-  }
+  const buildPayload = (page: number): QueryRequest => ({
+    model: activeModel,
+    ...(activeAppLabel ? { app_label: activeAppLabel } : {}),
+    select_fields: selectedFields.length > 0 ? selectedFields : ['id'],
+    filter_fields: serializeFilters(filters),
+    page,
+    page_size: limit,
+    title: `${activeModelLabel || activeModel} query`,
+  })
 
   const openSaveDialog = () => {
     setSaveName(`${activeModelLabel || activeModel} query`)
@@ -745,9 +1122,7 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
       return
     }
 
-    const columns = Array.from(
-      new Set(results.results.flatMap((row) => Object.keys(row))),
-    )
+    const columns = Array.from(new Set(results.results.flatMap((row) => Object.keys(row))))
 
     const escapeCsvValue = (value: unknown) => {
       const normalized = value == null ? '' : String(value)
@@ -759,14 +1134,21 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
 
     const csvLines = [
       columns.join(','),
-      ...results.results.map((row) => columns.map((column) => escapeCsvValue(row[column])).join(',')),
+      ...results.results.map((row) =>
+        columns.map((column) => escapeCsvValue(row[column])).join(','),
+      ),
     ]
 
-    const blob = new Blob([csvLines.join('\n')], { type: 'text/csv;charset=utf-8;' })
+    const blob = new Blob([csvLines.join('\n')], {
+      type: 'text/csv;charset=utf-8;',
+    })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `${activeModel.toLowerCase()}-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.csv`
+    link.download = `${activeModel.toLowerCase()}-${new Date()
+      .toISOString()
+      .slice(0, 19)
+      .replace(/[:T]/g, '-')}.csv`
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
@@ -776,9 +1158,7 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
   }
 
   const rows = (results?.results || []) as ResultRow[]
-  const fieldDialogTitle = fieldDialog?.type === 'filter' ? 'Choose filter field' : 'Add field'
   const displayModelLabel = activeModelLabel || activeModel
-  const fieldDialogModelLabel = fieldDialog?.type === 'filter' ? `${displayModelLabel} rule` : displayModelLabel
   const sortedResults = [...rows].sort((left, right) => {
     const leftValue = left[sortField] ?? ''
     const rightValue = right[sortField] ?? ''
@@ -792,40 +1172,89 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
     <div className="tab-panel active queries-page">
       <div className="animate-in">
         <div className="page-title-row">
-          <h1 className="page-title">Q<span>Lab</span></h1>
+          <h1 className="page-title">
+            Q<span>Lab</span>
+          </h1>
         </div>
         <div className="page-subtitle">dynamic · filterable · paginated</div>
       </div>
 
       <div className="card animate-in query-builder-card">
         <div className="card-header">
-          <span className="card-title">QLab · <span className="card-title-accent">{displayModelLabel}</span></span>
+          <span className="card-title">
+            QLab · <span className="card-title-accent">{displayModelLabel}</span>
+          </span>
         </div>
         <div className="card-body">
-        <ResourceRow activeModel={activeModel} activeModelLabel={activeModelLabel} />
+          <ResourceRow activeModel={activeModel} activeModelLabel={activeModelLabel} />
 
           <div className="field-selector">
             <span className="from-label">SELECT</span>
             {metadataLoading && <span className="field-hint">Loading fields…</span>}
-            {!metadataLoading && fieldOptions.length === 0 && <span className="field-hint">No fields available.</span>}
-            {!metadataLoading && selectedFields.map((field) => (
-              <button
-                key={field}
-                type="button"
-                className="resource-chip active"
-                onClick={() => toggleField(field)}
-              >
-                {field} ×
-              </button>
-            ))}
-            {!metadataLoading && fieldOptions.length > 0 && (
+            {!metadataLoading && directFieldNames.length === 0 && (
+              <span className="field-hint">No fields available.</span>
+            )}
+            {!metadataLoading &&
+              selectedFields.map((field) => (
+                <button
+                  key={field}
+                  type="button"
+                  className="resource-chip active"
+                  onClick={() => toggleField(field)}
+                >
+                  {field} ×
+                </button>
+              ))}
+            {!metadataLoading && directFieldNames.length > 0 && (
               <div className="field-picker-wrap">
-                <FieldPickerTrigger
-                  label={availableFields.length === 0 ? 'All Fields Added' : '+ Add Field'}
-                  disabled={availableFields.length === 0}
-                  className="field-selector-trigger"
-                  onClick={() => setFieldDialog((current) => current?.type === 'select' ? null : { type: 'select' })}
-                />
+                <button
+                  type="button"
+                  className="resource-chip add field-selector-trigger"
+                  disabled={!availableFields}
+                  onClick={() => {
+                    setFieldSearch('')
+                    setIsFieldPickerOpen((current) => !current)
+                  }}
+                >
+                  {availableFields ? '+ Add Field' : 'All Fields Added'}
+                </button>
+                {isFieldPickerOpen && availableFields && (
+                  <div className="field-picker-popover" ref={fieldPickerRef}>
+                    <div className="field-picker-popover-head">
+                      <span className="field-picker-popover-kicker">Add field</span>
+                      <button
+                        type="button"
+                        className="field-picker-close"
+                        onMouseDown={(event) => {
+                          event.preventDefault()
+                          event.stopPropagation()
+                          setIsFieldPickerOpen(false)
+                        }}
+                        aria-label="Close field picker"
+                      >
+                        ×
+                      </button>
+                    </div>
+                    <FieldAutocomplete
+                      value={fieldSearch}
+                      rootModel={activeModel}
+                      rootAppLabel={activeAppLabel}
+                      rootMetadata={activeMetadata}
+                      onRequestMetadata={onRequestMetadata}
+                      onChange={setFieldSearch}
+                      onSubmit={(path) => {
+                        if (!selectedFields.includes(path)) {
+                          toggleField(path)
+                        }
+                        setIsFieldPickerOpen(false)
+                        setFieldSearch('')
+                      }}
+                      autoFocus
+                      compact
+                      className="field-picker-popover-autocomplete"
+                    />
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -834,14 +1263,16 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
             <FilterGroupEditor
               node={filters}
               isRoot
-              fields={fieldOptions}
               fallbackField={fallbackField}
+              rootModel={activeModel}
+              rootAppLabel={activeAppLabel}
+              rootMetadata={activeMetadata}
               onUpdateGroup={handleGroupChange}
               onUpdateCondition={handleConditionChange}
               onAddCondition={handleAddConditionToGroup}
               onAddGroup={handleAddGroupToGroup}
               onRemoveNode={handleRemoveFilterNode}
-              onOpenFieldDialog={(conditionId) => setFieldDialog({ type: 'filter', conditionId })}
+              onRequestMetadata={onRequestMetadata}
             />
           </div>
 
@@ -849,7 +1280,12 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
             <button
               className="btn btn-primary"
               onClick={() => void handleRunQuery({ page: 1 })}
-              disabled={isLoading || metadataLoading || fieldOptions.length === 0 || selectedFields.length === 0}
+              disabled={
+                isLoading ||
+                metadataLoading ||
+                directFieldNames.length === 0 ||
+                selectedFields.length === 0
+              }
             >
               <IconPlay />
               {isLoading ? 'Running…' : 'Run Query'}
@@ -857,7 +1293,7 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
             <button
               className="btn btn-secondary"
               onClick={handleAddFilter}
-              disabled={metadataLoading || fieldOptions.length === 0}
+              disabled={metadataLoading || directFieldNames.length === 0}
             >
               <IconPlus /> Add Rule
             </button>
@@ -865,13 +1301,20 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
               <button
                 className="btn btn-secondary"
                 onClick={openSaveDialog}
-                disabled={metadataLoading || fieldOptions.length === 0 || selectedFields.length === 0}
+                disabled={
+                  metadataLoading ||
+                  directFieldNames.length === 0 ||
+                  selectedFields.length === 0
+                }
               >
                 Save Query
               </button>
             )}
             {filters.children.length > 0 && (
-              <button className="btn btn-ghost" onClick={() => setFilters(newGroup(fallbackField, 'and'))}>
+              <button
+                className="btn btn-ghost"
+                onClick={() => setFilters(newGroup(fallbackField, 'and'))}
+              >
                 Clear
               </button>
             )}
@@ -892,65 +1335,6 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
         </div>
       </div>
 
-      <Dialog open={Boolean(fieldDialog)} onClose={closeFieldDialog} className="field-picker-overlay">
-        <div className="field-picker-backdrop" aria-hidden="true" />
-        <div className="field-picker-overlay-shell">
-          <DialogPanel className="field-picker-modal">
-            <div className="field-picker-modal-head">
-              <div>
-                <div className="field-picker-modal-kicker">{fieldDialogTitle}</div>
-                <DialogTitle className="field-picker-modal-title">{fieldDialogModelLabel}</DialogTitle>
-              </div>
-              <button
-                type="button"
-                className="field-picker-close"
-                onPointerDown={(event) => {
-                  event.preventDefault()
-                  event.stopPropagation()
-                  closeFieldDialog()
-                }}
-                onClick={(event) => {
-                  event.preventDefault()
-                  event.stopPropagation()
-                }}
-                aria-label="Close field picker"
-              >
-                ×
-              </button>
-            </div>
-            <input
-              className="field-picker-input"
-              value={fieldSearch}
-              placeholder="Search field"
-              onChange={(event) => setFieldSearch(event.target.value)}
-              autoFocus
-            />
-            <div className="field-picker-list field-picker-list-modal">
-              {matchingFields.length === 0 && (
-                <div className="field-picker-empty">No matching fields.</div>
-              )}
-              {matchingFields.map((field) => (
-                <button
-                  key={field}
-                  type="button"
-                  className="field-picker-item"
-                  onClick={() => {
-                    if (fieldDialog?.type === 'filter') {
-                      handleConditionChange(fieldDialog.conditionId, { field })
-                    } else {
-                      toggleField(field)
-                    }
-                    closeFieldDialog()
-                  }}
-                >
-                  {field}
-                </button>
-              ))}
-            </div>
-          </DialogPanel>
-        </div>
-      </Dialog>
-
       <Dialog open={saveDialogOpen} onClose={closeSaveDialog} className="field-picker-overlay">
         <div className="field-picker-backdrop" aria-hidden="true" />
         <div className="field-picker-overlay-shell">
@@ -958,7 +1342,9 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
             <div className="field-picker-modal-head">
               <div>
                 <div className="field-picker-modal-kicker">Save query</div>
-                <DialogTitle className="field-picker-modal-title">{activeModel}</DialogTitle>
+                <DialogTitle className="field-picker-modal-title">
+                  {displayModelLabel}
+                </DialogTitle>
               </div>
               <button
                 type="button"
@@ -968,18 +1354,12 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
                   event.stopPropagation()
                   closeSaveDialog()
                 }}
-                onClick={(event) => {
-                  event.preventDefault()
-                  event.stopPropagation()
-                }}
                 aria-label="Close save query dialog"
               >
                 ×
               </button>
             </div>
-            <div className="save-query-summary">
-              {selectedFields.length} fields selected
-            </div>
+            <div className="save-query-summary">{selectedFields.length} fields selected</div>
             <div className="save-query-dialog-grid">
               <input
                 className="save-query-input"
@@ -1015,15 +1395,17 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
                         payload: buildPayload(1),
                       })
                       setSaveState('saved')
-                      window.setTimeout(() => {
-                        closeSaveDialog()
-                      }, 300)
+                      window.setTimeout(() => closeSaveDialog(), 300)
                     } catch {
                       setSaveState('idle')
                     }
                   }}
                 >
-                  {saveState === 'saving' ? 'Saving…' : saveState === 'saved' ? 'Saved' : 'Save Query'}
+                  {saveState === 'saving'
+                    ? 'Saving…'
+                    : saveState === 'saved'
+                      ? 'Saved'
+                      : 'Save Query'}
                 </button>
               </div>
             </div>
@@ -1032,7 +1414,10 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
       </Dialog>
 
       {results && (
-        <div className="card animate-in query-results-card" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div
+          className="card animate-in query-results-card"
+          style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+        >
           <div className="results-meta">
             <span className="result-count">{results.count}</span>
             <span className="result-count-label">results</span>
@@ -1041,7 +1426,12 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
             </div>
             <div className="card-actions-right">
               <button className="btn btn-ghost" onClick={() => void handleCopyJson()} title="Copy JSON">
-                <IconCopy /> {copyState === 'done' ? 'Copied' : copyState === 'error' ? 'Copy failed' : 'JSON'}
+                <IconCopy />{' '}
+                {copyState === 'done'
+                  ? 'Copied'
+                  : copyState === 'error'
+                    ? 'Copy failed'
+                    : 'JSON'}
               </button>
               <button className="btn btn-ghost" onClick={handleExportCsv} title="Export CSV">
                 <IconDownload /> {csvState === 'done' ? 'Downloaded' : 'CSV'}
@@ -1050,8 +1440,18 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
           </div>
 
           <div className="result-tabs">
-            <button className={`rtab${resultTab === 'table' ? ' active' : ''}`} onClick={() => setResultTab('table')}>Table</button>
-            <button className={`rtab${resultTab === 'json' ? ' active' : ''}`} onClick={() => setResultTab('json')}>JSON</button>
+            <button
+              className={`rtab${resultTab === 'table' ? ' active' : ''}`}
+              onClick={() => setResultTab('table')}
+            >
+              Table
+            </button>
+            <button
+              className={`rtab${resultTab === 'json' ? ' active' : ''}`}
+              onClick={() => setResultTab('json')}
+            >
+              JSON
+            </button>
           </div>
 
           {resultTab === 'table' && (
@@ -1082,8 +1482,7 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
               </button>
             ))}
             <span className="page-summary">
-              {(results.page - 1) * results.page_size + 1}
-              –
+              {(results.page - 1) * results.page_size + 1}–
               {Math.min(results.page * results.page_size, results.count)} of {results.count}
             </span>
           </div>

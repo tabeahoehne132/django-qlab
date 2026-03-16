@@ -12,7 +12,6 @@ import {
   SavedQueriesPage,
   SettingsPage,
   SettingsGroup,
-  SettingsToggle,
 } from './pages/WorkspacePages'
 import {
   BootstrapModel,
@@ -35,54 +34,7 @@ import {
 } from './lib/api'
 import './App.css'
 
-const TOUR_STEPS: Array<{
-  title: string
-  body: string
-  tab: TabId
-  selector: string
-}> = [
-  {
-    title: 'Start in the query builder',
-    body: 'Pick a model in the left sidebar, choose fields, then build up filters without writing lookups by hand.',
-    tab: 'queries',
-    selector: '.query-builder-card',
-  },
-  {
-    title: 'Build queries interactively',
-    body: 'Choose fields, create nested filter groups and run the query without writing Django lookups by hand.',
-    tab: 'queries',
-    selector: '.query-builder-card',
-  },
-  {
-    title: 'Save useful query states',
-    body: 'Save useful query states directly from the builder, then manage and edit them later in the Saved tab.',
-    tab: 'queries',
-    selector: '.query-builder-card',
-  },
-  {
-    title: 'Use History as your audit trail',
-    body: 'Replay past runs or convert them into saved queries when an ad-hoc exploration becomes something reusable.',
-    tab: 'history',
-    selector: '.history-list',
-  },
-]
-
-const SETTINGS_SECTIONS: SettingsGroup[] = [
-  {
-    key: 'general',
-    title: 'General',
-    items: [
-      { label: 'Enable saved views', description: 'Allow users to persist named views inside the host application.', control: <SettingsToggle checked /> },
-      { label: 'Default page size', description: 'Initial result size applied before users override the limit.', control: <input className="setting-input" defaultValue="100" /> },
-      { label: 'Environment badge', description: 'Visible environment marker shown in the left sidebar.', control: <select className="setting-select" defaultValue="Local"><option>Local</option><option>Staging</option><option>Prod</option></select> },
-    ],
-  },
-]
-
-const SETTINGS_NAV_ITEMS: DocsNavItem[] = SETTINGS_SECTIONS.map((section) => ({
-  key: section.key,
-  label: section.title,
-}))
+const SETTINGS_NAV_ITEMS: DocsNavItem[] = [{ key: 'general', label: 'General' }]
 
 const DOCS_ENTRIES: DocsEntry[] = [
   {
@@ -314,6 +266,9 @@ const getModelDisplayLabel = (model: Pick<BootstrapModel, 'model_name' | 'verbos
   return titleCaseWords(raw)
 }
 
+const getMetadataCacheKey = (modelName: string, appLabel?: string) =>
+  `${appLabel || ''}:${modelName}`
+
 // ─── App ─────────────────────────────────────────────────────────────────────
 
 export default function App() {
@@ -330,8 +285,7 @@ export default function App() {
   const [bootstrapModels, setBootstrapModels] = useState<BootstrapModel[]>([])
   const [historyItems, setHistoryItems] = useState<QueryHistoryItem[]>([])
   const [savedQueries, setSavedQueries] = useState<SavedQuery[]>([])
-  const [metadataByModel, setMetadataByModel] = useState<Record<string, MetadataResponse>>({})
-  const [inspectMetadataByModel, setInspectMetadataByModel] = useState<Record<string, MetadataResponse>>({})
+  const [metadataByKey, setMetadataByKey] = useState<Record<string, MetadataResponse>>({})
   const [queryPreset, setQueryPreset] = useState<QueryRequest | null>(null)
   const [queryResultPreset, setQueryResultPreset] = useState<QueryResponse | null>(null)
   const [activeSavedQueryId, setActiveSavedQueryId] = useState<number | null>(null)
@@ -339,10 +293,13 @@ export default function App() {
   const [recentModelNames, setRecentModelNames] = useState<string[]>([])
   const [isBootstrapping, setIsBootstrapping] = useState(true)
   const [bootstrapError, setBootstrapError] = useState<string | null>(null)
+  const [bootstrapConfig, setBootstrapConfig] = useState({
+    metadata: {
+      relation_depth: 1,
+      include_reverse_relations: false,
+    },
+  })
   const [settingsReady, setSettingsReady] = useState(false)
-  const [tourSeen, setTourSeen] = useState(true)
-  const [tourStep, setTourStep] = useState(0)
-  const [tourCardPos, setTourCardPos] = useState<{ top: number; left: number } | null>(null)
   const [activeHistoryModel, setActiveHistoryModel] = useState<string>('all')
   const [activeHistoryRange, setActiveHistoryRange] = useState<HistoryRange>('all')
   const [toasts, setToasts] = useState<ToastItem[]>([])
@@ -384,6 +341,9 @@ export default function App() {
           return
         }
         setBootstrapModels(bootstrap.models)
+        if (bootstrap.config) {
+          setBootstrapConfig(bootstrap.config)
+        }
         setHistoryItems(bootstrap.history)
         setSavedQueries(bootstrap.saved_queries)
         setActiveSavedQueryId(bootstrap.saved_queries[0]?.id ?? null)
@@ -403,9 +363,6 @@ export default function App() {
             ? (bootstrap.settings.ui_state.recent_models as string[])
             : [],
         )
-        const hasSeenTour = Boolean(bootstrap.settings.ui_state?.tour_seen)
-        setTourSeen(hasSeenTour)
-        setTourStep(0)
         setSettingsReady(true)
       } catch (error) {
         if (!isMounted) {
@@ -439,7 +396,6 @@ export default function App() {
         ui_state: {
           favorite_models: favoriteModels,
           recent_models: recentModelNames,
-          tour_seen: tourSeen,
         },
       } as Partial<BootstrapSettings>)
     }, 250)
@@ -454,98 +410,48 @@ export default function App() {
     recentModelNames,
     settingsReady,
     theme,
-    tourSeen,
   ])
 
-  useEffect(() => {
-    if (tourSeen) {
-      return
-    }
-    const step = TOUR_STEPS[tourStep]
-    if (activeTab !== step.tab) {
-      setActiveTab(step.tab)
-    }
-  }, [activeTab, tourSeen, tourStep])
-
-  useEffect(() => {
-    if (tourSeen) {
-      setTourCardPos(null)
-      return
-    }
-
-    const updateRect = () => {
-      const step = TOUR_STEPS[tourStep]
-      const element = document.querySelector(step.selector)
-      if (!element) {
-        setTourCardPos({ top: 24, left: 24 })
-        return
-      }
-      const rect = element.getBoundingClientRect()
-
-      const cardWidth = Math.min(420, window.innerWidth - 32)
-      const preferredLeft = rect.left + 12
-      const maxLeft = Math.max(16, window.innerWidth - cardWidth - 16)
-      const left = Math.min(preferredLeft, maxLeft)
-
-      const spaceBelow = window.innerHeight - rect.bottom
-      const top = spaceBelow > 260
-        ? Math.min(window.innerHeight - 220 - 16, rect.bottom + 20)
-        : Math.max(16, rect.top - 220 - 20)
-
-      setTourCardPos({ top, left })
-    }
-
-    const timeoutId = window.setTimeout(updateRect, 80)
-    window.addEventListener('resize', updateRect)
-    window.addEventListener('scroll', updateRect, true)
-    return () => {
-      window.clearTimeout(timeoutId)
-      window.removeEventListener('resize', updateRect)
-      window.removeEventListener('scroll', updateRect, true)
-    }
-  }, [activeTab, tourSeen, tourStep])
-
   const activeModelEntry = bootstrapModels.find((model) => model.model_name === activeModel)
+  const activeMetadataKey = activeModel ? getMetadataCacheKey(activeModel, activeModelEntry?.app_label) : ''
+  const activeMetadata = activeMetadataKey ? metadataByKey[activeMetadataKey] : undefined
+
+  const loadMetadata = async (modelName: string, appLabel?: string) => {
+    const cacheKey = getMetadataCacheKey(modelName, appLabel)
+    if (metadataByKey[cacheKey]) {
+      return metadataByKey[cacheKey]
+    }
+
+    const metadata = await getModelMetadata(modelName, appLabel, {
+      relationDepth: bootstrapConfig.metadata.relation_depth,
+      includeReverseRelations: bootstrapConfig.metadata.include_reverse_relations,
+    })
+
+    setMetadataByKey((current) => {
+      if (current[cacheKey]) {
+        return current
+      }
+      return { ...current, [cacheKey]: metadata }
+    })
+
+    return metadata
+  }
 
   useEffect(() => {
-    if (!activeModel || metadataByModel[activeModel]) {
+    if (!activeModel) {
       return
     }
 
-    const loadMetadata = async () => {
+    const preloadMetadata = async () => {
       try {
-        const metadata = await getModelMetadata(activeModel, activeModelEntry?.app_label, {
-          relationDepth: 1,
-          includeReverseRelations: false,
-        })
-        setMetadataByModel((current) => ({ ...current, [activeModel]: metadata }))
+        await loadMetadata(activeModel, activeModelEntry?.app_label)
       } catch (error) {
         console.error(error)
       }
     }
 
-    void loadMetadata()
-  }, [activeModel, activeModelEntry?.app_label, metadataByModel])
-
-  useEffect(() => {
-    if (activeTab !== 'models' || !activeModel || inspectMetadataByModel[activeModel]) {
-      return
-    }
-
-    const loadInspectMetadata = async () => {
-      try {
-        const metadata = await getModelMetadata(activeModel, activeModelEntry?.app_label, {
-          relationDepth: 2,
-          includeReverseRelations: true,
-        })
-        setInspectMetadataByModel((current) => ({ ...current, [activeModel]: metadata }))
-      } catch (error) {
-        console.error(error)
-      }
-    }
-
-    void loadInspectMetadata()
-  }, [activeModel, activeModelEntry?.app_label, activeTab, inspectMetadataByModel])
+    void preloadMetadata()
+  }, [activeModel, activeModelEntry?.app_label, bootstrapConfig.metadata.include_reverse_relations, bootstrapConfig.metadata.relation_depth, metadataByKey])
 
   const refreshHistory = async () => {
     try {
@@ -637,26 +543,10 @@ export default function App() {
     setActiveTab('queries')
   }
 
-  const activeMetadata = activeModel ? metadataByModel[activeModel] : undefined
-  const buildBlockedLookupMatcher = (metadata: MetadataResponse) => {
-    const blockedRoots = metadata.fields
-      .filter((field) => field.type === 'reverse_relation' || field.type === 'manytomany')
-      .map((field) => field.name)
-
-    return (lookup: string) => blockedRoots.some((root) => lookup === root || lookup.startsWith(`${root}__`))
-  }
-
-  const fieldOptions = activeMetadata
-    ? (() => {
-        const isBlockedLookup = buildBlockedLookupMatcher(activeMetadata)
-        return Array.from(
-          new Set([
-            ...activeMetadata.fields.map((field) => field.name),
-            ...activeMetadata.all_lookups,
-          ]),
-        ).filter((lookup) => !isBlockedLookup(lookup))
-      })()
-    : []
+  const getDirectFields = (metadata?: MetadataResponse) =>
+    metadata
+      ? metadata.fields.filter((field) => !field.name.includes('__'))
+      : []
 
   const colors = ['#4a9eff', '#7cbcff', '#f59e0b', '#2c7be5', '#ef4444', '#f97316']
   const buildFieldNotes = (field: MetadataField) => {
@@ -670,37 +560,8 @@ export default function App() {
   }
 
   const models: ModelDetail[] = bootstrapModels.map((model, index) => {
-    const metadata = inspectMetadataByModel[model.model_name] || metadataByModel[model.model_name]
-    const directFields = metadata
-      ? (() => {
-          const isBlockedLookup = buildBlockedLookupMatcher(metadata)
-          const fieldMap = new Map(
-            metadata.fields
-              .filter((field) => !isBlockedLookup(field.name))
-              .map((field) => [field.name, field]),
-          )
-
-          for (const lookup of metadata.all_lookups) {
-            if (isBlockedLookup(lookup) || fieldMap.has(lookup)) {
-              continue
-            }
-
-            fieldMap.set(lookup, {
-              name: lookup,
-              type: 'lookup',
-              label: lookup,
-              required: false,
-              allowed_operations: ['is', 'is_not', 'icontains'],
-              related_model: null,
-              filter_name: lookup,
-              max_length: null,
-              choices: null,
-            })
-          }
-
-          return Array.from(fieldMap.values())
-        })()
-      : []
+    const metadata = metadataByKey[getMetadataCacheKey(model.model_name, model.app_label)]
+    const directFields = getDirectFields(metadata)
     return {
       name: model.model_name,
       displayName: getModelDisplayLabel(model),
@@ -725,6 +586,7 @@ export default function App() {
         .map((field) => ({
           direction: field.type === 'reverse_relation' ? '<-' : field.type === 'manytomany' ? '↔' : '->',
           target: field.related_model || '',
+          targetAppLabel: field.related_app_label || model.app_label,
           field: field.filter_name || field.name,
           kind: field.type === 'reverse_relation' ? 'rev' : field.type === 'manytomany' ? 'm2m' : 'fk',
         })),
@@ -768,12 +630,6 @@ export default function App() {
     status: item.status === 'failed' ? 'failed' : item.status === 'draft' ? 'draft' : item.saved_query ? 'cached' : 'ok',
     queryPayload: item.query_payload,
   }))
-
-  const closeTour = () => {
-    setTourSeen(true)
-    setTourStep(0)
-    pushToast('success', 'QLab tour completed.')
-  }
 
   const now = Date.now()
   const historyModelCounts = historyItems.reduce<Record<string, number>>((acc, item) => {
@@ -855,7 +711,7 @@ export default function App() {
         activeModel={activeModel}
         savedQueries={savedQueryNavItems}
         activeSavedQueryId={activeSavedQueryId}
-        historyModelOptions={Object.entries(historyModelCounts).map(([label, count]) => ({ label, count }))}
+        historyModelOptions={Object.keys(historyModelCounts).map((label) => ({ label }))}
         activeHistoryModel={activeHistoryModel}
         onHistoryModelSelect={setActiveHistoryModel}
         activeHistoryRange={activeHistoryRange}
@@ -884,54 +740,20 @@ export default function App() {
             </div>
           ))}
         </div>
-        {!tourSeen && (
-          <div className="tour-overlay">
-            <div
-              className="tour-card"
-              style={tourCardPos ? { top: tourCardPos.top, left: tourCardPos.left } : undefined}
-            >
-              <div className="tour-kicker">Welcome to QLab</div>
-              <div className="tour-title">{TOUR_STEPS[tourStep].title}</div>
-              <div className="tour-body">{TOUR_STEPS[tourStep].body}</div>
-              <div className="tour-progress">
-                {TOUR_STEPS.map((_, index) => (
-                  <span key={index} className={`tour-dot${index === tourStep ? ' active' : ''}`} />
-                ))}
-              </div>
-              <div className="tour-actions">
-                <button className="btn btn-ghost" onClick={closeTour}>Skip</button>
-                {tourStep > 0 && (
-                  <button className="btn btn-secondary" onClick={() => setTourStep((current) => current - 1)}>Back</button>
-                )}
-                <button
-                  className="btn btn-primary"
-                  onClick={() => {
-                    if (tourStep === TOUR_STEPS.length - 1) {
-                      closeTour()
-                      return
-                    }
-                    setTourStep((current) => current + 1)
-                  }}
-                >
-                  {tourStep === TOUR_STEPS.length - 1 ? 'Finish' : 'Next'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
         {activeTab === 'queries' && (
               <QueriesPage
                 activeModel={activeModel}
                 activeModelLabel={activeModelEntry ? getModelDisplayLabel(activeModelEntry) : activeModel}
                 activeAppLabel={activeModelEntry?.app_label}
-            fieldOptions={fieldOptions}
-            metadataLoading={Boolean(activeModel) && !activeMetadata}
-            defaultPageSize={defaultPageSize}
-            queryPreset={queryPreset}
-            resultsPreset={queryResultPreset}
-            onPresetApplied={() => setQueryPreset(null)}
-            onResultsPresetApplied={() => setQueryResultPreset(null)}
-            onSaveQuery={async ({ name, description, payload }) => {
+                activeMetadata={activeMetadata}
+                metadataLoading={Boolean(activeModel) && !activeMetadata}
+                defaultPageSize={defaultPageSize}
+                queryPreset={queryPreset}
+                resultsPreset={queryResultPreset}
+                onPresetApplied={() => setQueryPreset(null)}
+                onResultsPresetApplied={() => setQueryResultPreset(null)}
+                onRequestMetadata={loadMetadata}
+                onSaveQuery={async ({ name, description, payload }) => {
               try {
                 const created = await createSavedQuery({
                   name,
@@ -966,12 +788,14 @@ export default function App() {
                 throw error
               }
             }}
-          />
+              />
         )}
         {activeTab === 'models' && (
           <ModelsPage
             models={models}
             activeModel={activeModel}
+            activeMetadata={activeMetadata}
+            onRequestMetadata={loadMetadata}
             onQueryModel={(modelName) => {
               setActiveModel(modelName)
               setActiveTab('queries')

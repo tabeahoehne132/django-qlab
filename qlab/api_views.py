@@ -167,6 +167,12 @@ class QLabBootstrapViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
                     "is_authenticated": True,
                 },
                 "settings": QLabUserSettingsSerializer(settings_obj).data,
+                "config": {
+                    "metadata": {
+                        "relation_depth": qlab_settings.METADATA_MAX_RELATION_DEPTH,
+                        "include_reverse_relations": qlab_settings.METADATA_INCLUDE_REVERSE_RELATIONS,
+                    },
+                },
                 "models": models_index,
                 "saved_queries": SavedQuerySerializer(
                     SavedQuery.objects.filter(user=request.user).order_by("name")[:20],

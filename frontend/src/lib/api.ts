@@ -51,6 +51,12 @@ export interface BootstrapResponse {
     is_authenticated: boolean
   }
   settings: BootstrapSettings
+  config: {
+    metadata: {
+      relation_depth: number
+      include_reverse_relations: boolean
+    }
+  }
   models: BootstrapModel[]
   saved_queries: SavedQuery[]
   history: QueryHistoryItem[]
@@ -64,6 +70,7 @@ export interface MetadataField {
   primary_key?: boolean
   allowed_operations: string[]
   related_model?: string | null
+  related_app_label?: string | null
   filter_name?: string | null
   max_length?: number | null
   choices?: Array<{ value: string; label: string }> | null

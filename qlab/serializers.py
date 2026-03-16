@@ -41,6 +41,11 @@ class FieldMetadataSerializer(serializers.Serializer):
         allow_null=True,
         help_text="Related model name (FK, M2M and reverse relations only)",
     )
+    related_app_label = serializers.CharField(
+        required=False,
+        allow_null=True,
+        help_text="Django app label of the related model.",
+    )
     filter_name = serializers.CharField(
         required=False,
         allow_null=True,

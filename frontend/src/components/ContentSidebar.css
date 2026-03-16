@@ -58,6 +58,7 @@
   display: flex; align-items: flex-start; gap: 8px;
   padding: 6px 6px; border-radius: 4px; cursor: pointer;
   transition: background 0.12s; border: 1px solid transparent;
+  min-width: 0;
 }
 .res-item:hover { background: var(--surface2); }
 .res-item.active { background: var(--accent-dim); border-color: rgba(74,158,255,0.18); }
@@ -72,19 +73,11 @@
   min-width: 0;
   line-height: 1.35;
   overflow-wrap: anywhere;
+  word-break: break-word;
   transition: color 0.12s;
 }
 .res-item:hover .res-name { color: var(--text); }
 .res-item.active .res-name { color: var(--accent); font-weight: 500; }
-
-.res-count {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 0.62rem;
-  color: var(--muted);
-  flex-shrink: 0;
-  align-self: flex-start;
-  margin-top: 1px;
-}
 
 .favorite-btn {
   border: none;
@@ -141,6 +134,7 @@
   margin-bottom: 2px;
   line-height: 1.35;
   overflow-wrap: anywhere;
+  word-break: break-word;
   transition: color 0.12s;
 }
 .recent-item:hover .recent-title { color: var(--text); }
@@ -150,6 +144,7 @@
   color: var(--muted);
   line-height: 1.45;
   overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .csidebar-footer { padding: 10px; border-top: 1px solid var(--border); flex-shrink: 0; }

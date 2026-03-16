@@ -77,6 +77,7 @@
 
 .field-picker-wrap {
   display: inline-flex;
+  position: relative;
 }
 
 .query-builder-card {
@@ -148,6 +149,40 @@
   color: var(--text);
 }
 
+.field-picker-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 140;
+  width: min(440px, calc(100vw - 96px));
+  padding: 10px;
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  background: var(--panel-tint-strong);
+  box-shadow: var(--shadow-pop);
+}
+
+.field-picker-popover-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.field-picker-popover-kicker {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent2);
+}
+
+.field-picker-popover-autocomplete {
+  width: 100%;
+}
+
 .field-picker-top {
   display: flex;
   align-items: center;
@@ -158,20 +193,51 @@
   min-width: 160px;
 }
 
+.field-autocomplete {
+  position: relative;
+  min-width: 0;
+}
+
+.field-autocomplete-input,
 .field-picker-input {
   width: 100%;
+  min-height: 42px;
   background: var(--surface2);
   border: 1px solid var(--border2);
   border-radius: 4px;
-  padding: 7px 8px;
+  padding: 10px 12px;
   color: var(--text);
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 0.68rem;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  transition: border-color 0.12s, background 0.12s;
 }
 
+.field-autocomplete-input:focus,
 .field-picker-input:focus {
   outline: none;
   border-color: var(--accent);
+  background: rgba(74, 158, 255, 0.04);
+}
+
+.field-autocomplete-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 160;
+  width: max(100%, 280px);
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  background: var(--surface);
+  box-shadow: var(--shadow-pop);
+  overflow: auto;
+  max-height: min(36vh, 280px);
+}
+
+.field-autocomplete.compact .field-autocomplete-input {
+  min-height: 32px;
+  padding: 5px 10px;
+  font-size: 0.72rem;
 }
 
 .field-picker-close {
@@ -273,11 +339,38 @@
   border: 1px solid transparent;
   background: transparent;
   color: var(--muted2);
-  border-radius: 4px;
-  padding: 7px 8px;
+  border-radius: 3px;
+  padding: 8px 10px;
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 0.68rem;
+  font-size: 0.7rem;
   cursor: pointer;
+  transition: border-color 0.12s, background 0.12s, color 0.12s;
+}
+
+.field-picker-item + .field-picker-item {
+  margin-top: 2px;
+}
+
+.field-picker-item-path,
+.field-picker-item-meta {
+  display: block;
+}
+
+.field-picker-item-path {
+  color: var(--text);
+  font-size: 0.74rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.field-picker-item-meta {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 0.61rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .field-picker-item:hover,
@@ -295,9 +388,38 @@
   font-size: 0.64rem;
 }
 
+:root[data-theme="light"] .field-picker-input,
+:root[data-theme="light"] .field-autocomplete-input {
+  background: #fff;
+  color: #1b2b44;
+  border-color: rgba(59, 88, 126, 0.18);
+}
+
+:root[data-theme="light"] .field-autocomplete-input:focus,
+:root[data-theme="light"] .field-picker-input:focus {
+  background: rgba(74, 158, 255, 0.06);
+}
+
+:root[data-theme="light"] .field-autocomplete-menu {
+  background: #fdfefe;
+  border-color: rgba(59, 88, 126, 0.18);
+}
+
+:root[data-theme="light"] .field-picker-item {
+  background: transparent;
+  border-color: transparent;
+}
+
+:root[data-theme="light"] .field-picker-item:hover,
+:root[data-theme="light"] .field-picker-item[data-focus],
+:root[data-theme="light"] .field-picker-item[data-headlessui-state~="active"] {
+  background: rgba(74, 158, 255, 0.06);
+  border-color: rgba(74, 158, 255, 0.32);
+}
+
 /* Filter rows */
 .filter-rows { display: flex; flex-direction: column; gap: 7px; margin-bottom: 14px; }
-.filter-row { display: flex; align-items: stretch; gap: 7px; flex-wrap: wrap; }
+.filter-row { display: flex; align-items: flex-start; gap: 7px; flex-wrap: wrap; }
 
 .filter-field-picker {
   position: relative;

@@ -212,6 +212,7 @@ def extract_field_metadata(
                 "required": False,
                 "allowed_operations": ["is", "is_not"],
                 "related_model": related_model.__name__,
+                "related_app_label": related_model._meta.app_label,
                 "filter_name": field.related_name
                 or field.related_model._meta.model_name,
             }
@@ -256,6 +257,7 @@ def extract_field_metadata(
                 field, (models.ForeignKey, models.OneToOneField, models.ManyToManyField)
             ):
                 field_info["related_model"] = field.related_model.__name__
+                field_info["related_app_label"] = field.related_model._meta.app_label
 
             fields_metadata.append(field_info)
             all_lookups.append(full_field_path)

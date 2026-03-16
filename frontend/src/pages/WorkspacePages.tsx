@@ -1,6 +1,6 @@
 import React from 'react'
 import { ModelEntry } from '../components/ContentSidebar'
-import { SavedQuery } from '../lib/api'
+import { MetadataResponse, SavedQuery } from '../lib/api'
 import './WorkspacePages.css'
 
 interface ModelField {
@@ -28,6 +28,8 @@ interface ModelDetail extends ModelEntry {
 interface ModelsPageProps {
   models: ModelDetail[]
   activeModel: string
+  activeMetadata?: MetadataResponse
+  onRequestMetadata?: (modelName: string, appLabel?: string) => Promise<MetadataResponse>
   onQueryModel?: (modelName: string) => void
 }
 
@@ -111,22 +113,326 @@ const statusClass = {
   failed: 'badge-offline',
 } as const
 
-const SettingsToggle: React.FC<{ checked?: boolean }> = ({ checked = false }) => (
-  <label className="toggle">
-    <input type="checkbox" defaultChecked={checked} />
-    <span className="toggle-track" />
-    <span className="toggle-thumb" />
-  </label>
+const RELATION_TYPES = new Set(['foreignkey', 'onetoone', 'manytomany', 'reverse_relation'])
+
+const splitModelIdentifier = (value: string) =>
+  value
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/_/g, ' ')
+    .trim()
+
+const titleCaseWords = (value: string) =>
+  value
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+
+const getReadableModelLabel = (modelName: string, fallback?: string) =>
+  titleCaseWords((fallback || splitModelIdentifier(modelName)).trim())
+
+const getDirectMetadataFields = (metadata?: MetadataResponse) =>
+  metadata ? metadata.fields.filter((field) => !field.name.includes('__')) : []
+
+const isRelationMetadataField = (field: MetadataResponse['fields'][number]) =>
+  RELATION_TYPES.has(field.type) && Boolean(field.related_model)
+
+const buildFieldNotes = (field: MetadataResponse['fields'][number]) => {
+  const notes: string[] = []
+  if (field.primary_key) notes.push('Primary key')
+  if (field.max_length) notes.push(`max_length=${field.max_length}`)
+  if (field.related_model) {
+    notes.push(`${field.type === 'reverse_relation' ? '←' : '→'} ${field.related_model}`)
+  }
+  if (field.filter_name) notes.push(`filter: ${field.filter_name}`)
+  if (field.choices?.length) {
+    notes.push(`choices: ${field.choices.map((choice) => choice.label).join(', ')}`)
+  }
+  return notes.join(' · ')
+}
+
+type MetadataFieldLike = MetadataResponse['fields'][number]
+
+interface RelationSummary {
+  key: string
+  fieldName: string
+  targetModel: string
+  targetAppLabel?: string
+  kind: 'fk' | 'm2m' | 'rev'
+}
+
+const getRelationKind = (field: MetadataFieldLike): RelationSummary['kind'] => (
+  field.type === 'reverse_relation'
+    ? 'rev'
+    : field.type === 'manytomany'
+      ? 'm2m'
+      : 'fk'
 )
+
+const buildRelations = (metadata?: MetadataResponse): RelationSummary[] =>
+  getDirectMetadataFields(metadata)
+    .filter((field) => isRelationMetadataField(field))
+    .map((field) => ({
+      key: `${field.name}:${field.related_model}:${field.related_app_label || metadata?.app_label || ''}`,
+      fieldName: field.filter_name || field.name,
+      targetModel: field.related_model || '',
+      targetAppLabel: field.related_app_label || metadata?.app_label,
+      kind: getRelationKind(field),
+    }))
+
+interface ModelInspectPanelProps {
+  modelName: string
+  modelLabel: string
+  appLabel?: string
+  metadata?: MetadataResponse
+  modelsIndex: Map<string, ModelDetail>
+  onRequestMetadata: (modelName: string, appLabel?: string) => Promise<MetadataResponse>
+  onQueryModel?: (modelName: string) => void
+  level?: number
+  root?: boolean
+}
+
+const ModelInspectPanel: React.FC<ModelInspectPanelProps> = ({
+  modelName,
+  modelLabel,
+  appLabel,
+  metadata,
+  modelsIndex,
+  onRequestMetadata,
+  onQueryModel,
+  level = 0,
+  root = false,
+}) => {
+  const [resolvedMetadata, setResolvedMetadata] = React.useState<MetadataResponse | undefined>(metadata)
+  const [isLoading, setIsLoading] = React.useState(!metadata)
+  const [loadError, setLoadError] = React.useState<string | null>(null)
+  const [expandedKeys, setExpandedKeys] = React.useState<string[]>([])
+  const [nestedMetadata, setNestedMetadata] = React.useState<Record<string, MetadataResponse>>({})
+  const [nestedLoading, setNestedLoading] = React.useState<Record<string, boolean>>({})
+  const [nestedErrors, setNestedErrors] = React.useState<Record<string, string>>({})
+
+  React.useEffect(() => {
+    setResolvedMetadata(metadata)
+    setIsLoading(!metadata)
+    setLoadError(null)
+    setExpandedKeys([])
+    setNestedMetadata({})
+    setNestedLoading({})
+    setNestedErrors({})
+  }, [metadata, modelName, appLabel])
+
+  React.useEffect(() => {
+    if (metadata || !modelName) {
+      return
+    }
+
+    let active = true
+    setIsLoading(true)
+    setLoadError(null)
+
+    void onRequestMetadata(modelName, appLabel)
+      .then((response) => {
+        if (active) {
+          setResolvedMetadata(response)
+        }
+      })
+      .catch((error) => {
+        if (active) {
+          setLoadError(error instanceof Error ? error.message : 'Could not load model metadata.')
+        }
+      })
+      .finally(() => {
+        if (active) {
+          setIsLoading(false)
+        }
+      })
+
+    return () => {
+      active = false
+    }
+  }, [appLabel, metadata, modelName, onRequestMetadata])
+
+  const directFields = React.useMemo(
+    () => getDirectMetadataFields(resolvedMetadata),
+    [resolvedMetadata],
+  )
+  const relations = React.useMemo(
+    () => buildRelations(resolvedMetadata),
+    [resolvedMetadata],
+  )
+
+  const toggleRelation = async (relation: RelationSummary) => {
+    setExpandedKeys((current) =>
+      current.includes(relation.key)
+        ? current.filter((key) => key !== relation.key)
+        : [...current, relation.key],
+    )
+
+    if (nestedMetadata[relation.key] || nestedLoading[relation.key]) {
+      return
+    }
+
+    setNestedLoading((current) => ({ ...current, [relation.key]: true }))
+    setNestedErrors((current) => ({ ...current, [relation.key]: '' }))
+
+    try {
+      const response = await onRequestMetadata(relation.targetModel, relation.targetAppLabel)
+      setNestedMetadata((current) => ({ ...current, [relation.key]: response }))
+    } catch (error) {
+      setNestedErrors((current) => ({
+        ...current,
+        [relation.key]: error instanceof Error ? error.message : 'Could not load relation metadata.',
+      }))
+    } finally {
+      setNestedLoading((current) => ({ ...current, [relation.key]: false }))
+    }
+  }
+
+  return (
+    <div className={`card models-card${root ? ' root-model-card' : ' nested-model-card'} level-${level}`}>
+      <div className="card-header">
+        <span className="card-title">
+          <span className="card-title-accent">{root ? '▸' : '↳'}</span> {modelLabel}
+        </span>
+        <div className="card-actions-right">
+          <button className="query-hint-btn" onClick={() => onQueryModel?.(modelName)}>
+            Query this Model →
+          </button>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="card-body">
+          <div className="empty-state">Loading model metadata…</div>
+        </div>
+      ) : loadError ? (
+        <div className="card-body">
+          <div className="compact-error">{loadError}</div>
+        </div>
+      ) : resolvedMetadata ? (
+        <>
+          <div className="result-tabs">
+            <button className="rtab active">Selectable Fields</button>
+          </div>
+          <div className="table-scroll">
+            <table className="field-table">
+              <thead>
+                <tr>
+                  <th>Field</th>
+                  <th>Type</th>
+                  <th>Null</th>
+                  <th>Filterable</th>
+                  <th>Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {directFields.map((field) => (
+                  <tr key={field.name}>
+                    <td className="field-name">{field.name}</td>
+                    <td className="field-type">{field.type}</td>
+                    <td className="field-null">{field.required ? '—' : 'nullable'}</td>
+                    <td className={field.allowed_operations.length > 0 ? 'field-filter-yes' : 'field-filter-no'}>
+                      {field.allowed_operations.length > 0 ? '✓ yes' : '✗ no'}
+                    </td>
+                    <td className="td-plain">{buildFieldNotes(field)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="card relation-card relation-card-inline">
+            <div className="card-header">
+              <span className="card-title">
+                <span className="card-title-accent">▸</span> Relations
+              </span>
+            </div>
+            <div>
+              {relations.length === 0 && <div className="empty-state compact">No direct relations.</div>}
+              {relations.map((relation) => {
+                const isExpanded = expandedKeys.includes(relation.key)
+                const nested = nestedMetadata[relation.key]
+                const nestedLabel =
+                  modelsIndex.get(`${relation.targetAppLabel || ''}:${relation.targetModel}`)?.displayName ||
+                  getReadableModelLabel(relation.targetModel)
+
+                return (
+                  <div key={relation.key} className="relation-block">
+                    <button
+                      type="button"
+                      className={`relation-row relation-toggle${isExpanded ? ' expanded' : ''}`}
+                      onClick={() => void toggleRelation(relation)}
+                    >
+                      <span
+                        className={
+                          relation.kind === 'fk'
+                            ? 'badge badge-fk'
+                            : relation.kind === 'm2m'
+                              ? 'badge badge-m2m'
+                              : 'badge badge-offline'
+                        }
+                      >
+                        {relation.kind === 'fk' ? 'FK →' : relation.kind === 'm2m' ? 'M2M ↔' : '← REV'}
+                      </span>
+                      <span className="relation-arrow">{modelLabel}</span>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2">
+                        <path d="M5 12h14M12 5l7 7-7 7" />
+                      </svg>
+                      <span className="relation-target">{nestedLabel}</span>
+                      <span className="relation-field">{relation.fieldName}</span>
+                      <span className="relation-expand">{isExpanded ? '−' : '+'}</span>
+                    </button>
+
+                    {isExpanded && (
+                      <div className="nested-model-panels">
+                        {nestedLoading[relation.key] && (
+                          <div className="empty-state compact">Loading related model…</div>
+                        )}
+                        {!nestedLoading[relation.key] && nestedErrors[relation.key] && (
+                          <div className="compact-error">{nestedErrors[relation.key]}</div>
+                        )}
+                        {!nestedLoading[relation.key] && nested && (
+                          <ModelInspectPanel
+                            modelName={relation.targetModel}
+                            modelLabel={nestedLabel}
+                            appLabel={relation.targetAppLabel}
+                            metadata={nested}
+                            modelsIndex={modelsIndex}
+                            onRequestMetadata={onRequestMetadata}
+                            onQueryModel={onQueryModel}
+                            level={level + 1}
+                          />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </>
+      ) : null}
+    </div>
+  )
+}
 
 export const ModelsPage: React.FC<ModelsPageProps> = ({
   models,
   activeModel,
+  activeMetadata,
+  onRequestMetadata,
   onQueryModel,
 }) => {
   const active = models.find((model) => model.name === activeModel) ?? models[0]
+  const modelsIndex = React.useMemo(
+    () =>
+      new Map(
+        models.map((model) => [`${model.appLabel || ''}:${model.name}`, model] as const),
+      ),
+    [models],
+  )
 
-  if (!active) {
+  if (!active || !onRequestMetadata) {
     return (
       <div className="tab-panel active workspace-page">
         <div className="empty-state">No model metadata available yet.</div>
@@ -144,64 +450,16 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({
       </div>
 
       <div className="workspace-stack models-stack animate-in">
-        <div className="card models-card" id="model-detail-card">
-          <div className="card-header">
-            <span className="card-title"><span className="card-title-accent">▸</span> {active.displayName || active.name}</span>
-            <div className="card-actions-right">
-              <button className="query-hint-btn" onClick={() => onQueryModel?.(active.name)}>Query this Model →</button>
-            </div>
-          </div>
-          <div className="result-tabs">
-            <button className="rtab active">Selectable Fields</button>
-          </div>
-          <div className="table-scroll">
-            <table className="field-table">
-              <thead>
-                <tr>
-                  <th>Field</th>
-                  <th>Type</th>
-                  <th>Null</th>
-                  <th>Filterable</th>
-                  <th>Notes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {active.fields.map((field) => (
-                  <tr key={field.name}>
-                    <td className="field-name">{field.name}</td>
-                    <td className="field-type">{field.type}</td>
-                    <td className="field-null">{field.nullable ? 'nullable' : '—'}</td>
-                    <td className={field.filterable ? 'field-filter-yes' : 'field-filter-no'}>
-                      {field.filterable ? '✓ yes' : '✗ no'}
-                    </td>
-                    <td className="td-plain">{field.notes}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div className="card relation-card">
-          <div className="card-header">
-            <span className="card-title"><span className="card-title-accent">▸</span> Relations</span>
-          </div>
-          <div>
-            {active.relations.map((relation) => (
-              <div key={`${relation.target}-${relation.field}`} className="relation-row">
-                <span className={relation.kind === 'fk' ? 'badge badge-fk' : relation.kind === 'm2m' ? 'badge badge-m2m' : 'badge badge-offline'}>
-                  {relation.kind === 'fk' ? 'FK →' : relation.kind === 'm2m' ? 'M2M ↔' : '← REV'}
-                </span>
-                <span className="relation-arrow">{active.name}</span>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2">
-                  <path d="M5 12h14M12 5l7 7-7 7" />
-                </svg>
-                <span className="relation-target">{relation.target}</span>
-                <span className="relation-field">{relation.field}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+        <ModelInspectPanel
+          modelName={active.name}
+          modelLabel={active.displayName || getReadableModelLabel(active.name)}
+          appLabel={active.appLabel}
+          metadata={activeMetadata}
+          modelsIndex={modelsIndex}
+          onRequestMetadata={onRequestMetadata}
+          onQueryModel={onQueryModel}
+          root
+        />
       </div>
     </div>
   )
@@ -332,7 +590,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ sections, activeSett
                   <div className="setting-label">{item.label}</div>
                   <div className="setting-desc">{item.description}</div>
                 </div>
-                {item.control}
+                <div className="setting-control">{item.control}</div>
               </div>
             ))}
           </div>
@@ -532,5 +790,4 @@ export const SavedQueriesPage: React.FC<SavedQueriesPageProps> = ({
   )
 }
 
-export { SettingsToggle }
 export type { DocsEntry, HistoryItem, ModelDetail, SettingsGroup }

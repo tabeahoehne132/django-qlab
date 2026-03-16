@@ -37,7 +37,6 @@ export interface DocsNavGroup {
 
 interface SidebarChoice {
   label: string
-  count?: number
   color?: string
   active?: boolean
 }
@@ -50,7 +49,7 @@ interface ContentSidebarProps {
   activeModel?: string
   savedQueries?: SavedQueryNavItem[]
   activeSavedQueryId?: number | null
-  historyModelOptions?: Array<{ label: string; count: number }>
+  historyModelOptions?: Array<{ label: string }>
   activeHistoryModel?: string
   onHistoryModelSelect?: (model: string) => void
   activeHistoryRange?: 'all' | 'today' | '7d' | '30d'
@@ -388,12 +387,11 @@ const PassiveSidebarItem: React.FC<{ item: SidebarChoice }> = ({ item }) => (
   <div className={`res-item${item.active ? ' active' : ''}`}>
     {item.color && <div className="res-pip" style={{ background: item.color, color: item.color }} />}
     <span className="res-name">{item.label}</span>
-    {typeof item.count === 'number' && <span className="res-count">{item.count}</span>}
   </div>
 )
 
 const HistorySidebarPanel: React.FC<{
-  modelOptions: Array<{ label: string; count: number }>
+  modelOptions: Array<{ label: string }>
   activeModel: string
   onSelectModel?: (model: string) => void
   activeRange: 'all' | 'today' | '7d' | '30d'
@@ -410,7 +408,7 @@ const HistorySidebarPanel: React.FC<{
         </div>
         {modelOptions.map((item) => (
           <div key={item.label} onClick={() => onSelectModel?.(item.label)}>
-            <PassiveSidebarItem item={{ label: item.label, count: item.count, active: activeModel === item.label }} />
+            <PassiveSidebarItem item={{ label: item.label, active: activeModel === item.label }} />
           </div>
         ))}
       </div>
