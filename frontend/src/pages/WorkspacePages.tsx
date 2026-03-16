@@ -115,14 +115,17 @@ const statusClass = {
 
 const RELATION_TYPES = new Set(['foreignkey', 'onetoone', 'manytomany', 'reverse_relation'])
 
-const splitModelIdentifier = (value: string) =>
-  value
+const asDisplayString = (value: unknown) =>
+  typeof value === 'string' ? value : value == null ? '' : String(value)
+
+const splitModelIdentifier = (value: unknown) =>
+  asDisplayString(value)
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
     .replace(/_/g, ' ')
     .trim()
 
-const titleCaseWords = (value: string) =>
-  value
+const titleCaseWords = (value: unknown) =>
+  asDisplayString(value)
     .split(/\s+/)
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))

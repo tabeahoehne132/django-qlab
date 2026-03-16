@@ -248,21 +248,25 @@ interface ToastItem {
   message: string
 }
 
-const titleCaseWords = (value: string) =>
-  value
+const asDisplayString = (value: unknown) =>
+  typeof value === 'string' ? value : value == null ? '' : String(value)
+
+const titleCaseWords = (value: unknown) =>
+  asDisplayString(value)
     .split(/\s+/)
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ')
 
-const splitModelIdentifier = (value: string) =>
-  value
+const splitModelIdentifier = (value: unknown) =>
+  asDisplayString(value)
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
     .replace(/_/g, ' ')
     .trim()
 
 const getModelDisplayLabel = (model: Pick<BootstrapModel, 'model_name' | 'verbose_name'>) => {
-  const raw = model.verbose_name?.trim() || splitModelIdentifier(model.model_name)
+  const verboseName = asDisplayString(model.verbose_name).trim()
+  const raw = verboseName || splitModelIdentifier(model.model_name)
   return titleCaseWords(raw)
 }
 

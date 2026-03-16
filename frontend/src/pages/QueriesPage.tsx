@@ -766,6 +766,34 @@ const ResultsTable: React.FC<{
   )
 }
 
+const buildPaginationItems = (currentPage: number, totalPages: number) => {
+  if (totalPages <= 1) {
+    return [1] as Array<number | 'ellipsis'>
+  }
+
+  const pages = new Set<number>([1, totalPages])
+  for (
+    let page = Math.max(1, currentPage - 2);
+    page <= Math.min(totalPages, currentPage + 2);
+    page += 1
+  ) {
+    pages.add(page)
+  }
+
+  const sortedPages = Array.from(pages).sort((left, right) => left - right)
+  const items: Array<number | 'ellipsis'> = []
+
+  sortedPages.forEach((page, index) => {
+    const previousPage = sortedPages[index - 1]
+    if (previousPage && page - previousPage > 1) {
+      items.push('ellipsis')
+    }
+    items.push(page)
+  })
+
+  return items
+}
+
 interface QueriesPageProps {
   activeModel: string
   activeModelLabel?: string
@@ -1167,6 +1195,10 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
     })
     return sortDir === 'asc' ? comparison : -comparison
   })
+  const paginationItems = useMemo(
+    () => buildPaginationItems(results?.page || 1, results?.total_pages || 1),
+    [results?.page, results?.total_pages],
+  )
 
   return (
     <div className="tab-panel active queries-page">
@@ -1472,15 +1504,35 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
           )}
 
           <div className="pagination">
-            {Array.from({ length: results.total_pages }, (_, index) => index + 1).map((page) => (
-              <button
-                key={page}
-                className={`ppage${results.page === page ? ' cur' : ''}`}
-                onClick={() => void handleRunQuery({ page })}
-              >
-                {page}
-              </button>
-            ))}
+            <button
+              className="ppage ppage-nav"
+              disabled={results.page <= 1}
+              onClick={() => void handleRunQuery({ page: results.page - 1 })}
+            >
+              Prev
+            </button>
+            {paginationItems.map((item, index) =>
+              item === 'ellipsis' ? (
+                <span key={`ellipsis-${index}`} className="ppage-ellipsis">
+                  …
+                </span>
+              ) : (
+                <button
+                  key={item}
+                  className={`ppage${results.page === item ? ' cur' : ''}`}
+                  onClick={() => void handleRunQuery({ page: item })}
+                >
+                  {item}
+                </button>
+              ),
+            )}
+            <button
+              className="ppage ppage-nav"
+              disabled={results.page >= results.total_pages}
+              onClick={() => void handleRunQuery({ page: results.page + 1 })}
+            >
+              Next
+            </button>
             <span className="page-summary">
               {(results.page - 1) * results.page_size + 1}–
               {Math.min(results.page * results.page_size, results.count)} of {results.count}
