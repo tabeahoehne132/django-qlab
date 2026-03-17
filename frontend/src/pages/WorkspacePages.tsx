@@ -307,8 +307,8 @@ const ModelInspectPanel: React.FC<ModelInspectPanelProps> = ({
                 <tr>
                   <th>Field</th>
                   <th>Type</th>
-                  <th>Null</th>
-                  <th>Filterable</th>
+                  <th>Filterable?</th>
+                  <th>Nullable?</th>
                   <th>Notes</th>
                 </tr>
               </thead>
@@ -317,11 +317,12 @@ const ModelInspectPanel: React.FC<ModelInspectPanelProps> = ({
                   <tr key={field.name}>
                     <td className="field-name">{field.name}</td>
                     <td className="field-type">{field.type}</td>
-                    <td className="field-null">{field.required ? '—' : 'nullable'}</td>
                     <td className={field.allowed_operations.length > 0 ? 'field-filter-yes' : 'field-filter-no'}>
                       {field.allowed_operations.length > 0 ? '✓ yes' : '✗ no'}
                     </td>
-                    <td className="td-plain">{buildFieldNotes(field)}</td>
+                    <td className="field-null">{field.required ? '—' : '✓ yes'}</td>
+
+                    <td className="td-plain">{buildFieldNotes(field).length > 0 ? buildFieldNotes(field) : '—'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -330,9 +331,7 @@ const ModelInspectPanel: React.FC<ModelInspectPanelProps> = ({
 
           <div className="card relation-card relation-card-inline">
             <div className="card-header">
-              <span className="card-title">
-                <span className="card-title-accent">▸</span> Relations
-              </span>
+              <span className="card-title">Relations</span>
             </div>
             <div>
               {relations.length === 0 && <div className="empty-state compact">No direct relations.</div>}
@@ -355,7 +354,7 @@ const ModelInspectPanel: React.FC<ModelInspectPanelProps> = ({
                         {' '}
                         <span
                           className="relation-kind-arrow"
-                          title={
+                          data-tip={
                             relation.kind === 'fk'
                               ? 'Foreign Key'
                               : relation.kind === 'm2m'
@@ -481,7 +480,7 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ historyItems, onReplay
 
       <div className="card animate-in history-card">
         <div className="card-header">
-          <span className="card-title">Run <span className="card-title-accent">History</span></span>
+          <span className="card-title">History</span>
           {selectedIds.length > 0 && (
             <div className="card-actions-right">
               <button
@@ -553,10 +552,10 @@ export const DocsPage: React.FC<DocsPageProps> = ({ docs, activeDocKey }) => {
 
       <div className="workspace-stack animate-in docs-stack">
         <div className="card docs-card">
+          <div className="card-header">
+            <span className="card-title">{entry.title}</span>
+          </div>
           <div className="card-body docs-content docs-content-single">
-            <div className="docs-h1">
-              {entry.title.split(' ')[0]} <span>{entry.title.split(' ').slice(1).join(' ')}</span>
-            </div>
             <div className="docs-tagline">{entry.tagline}</div>
 
             <div className="docs-h2">Overview</div>
@@ -639,7 +638,7 @@ export const SavedQueriesPage: React.FC<SavedQueriesPageProps> = ({
       <div className="workspace-stack animate-in">
         <div className="card">
           <div className="card-header">
-            <span className="card-title">Saved <span className="card-title-accent">Queries</span></span>
+            <span className="card-title">Saved Queries</span>
             {selectedIds.length > 0 && (
               <div className="card-actions-right">
                 <button

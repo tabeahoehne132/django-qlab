@@ -544,7 +544,7 @@ export default function App() {
       ? metadata.fields.filter((field) => !field.name.includes('__'))
       : []
 
-  const colors = ['#4a9eff', '#7cbcff', '#f59e0b', '#2c7be5', '#ef4444', '#f97316']
+  const colors = ['#4a9eff', '#7cbcff', '#ad4eff', '#2c7be5', '#8c84ff', '#00efff']
   const buildFieldNotes = (field: MetadataField) => {
     const notes: string[] = []
     if (field.primary_key) notes.push('Primary key')

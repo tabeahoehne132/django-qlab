@@ -7,7 +7,7 @@
   --border:    #243047;
   --border2:   #2e3c57;
   --text:      #e2e8f0;
-  --muted:     #64728b;
+  --muted:     #a8bad9;
   --muted2:    #8795ab;
   --accent:    #4a9eff;
   --accent-dim:#4a9eff18;
@@ -32,8 +32,8 @@
   --border:    #e2e6ed;
   --border2:   #d0d6e0;
   --text:      #111827;
-  --muted:     #9aa3b0;
-  --muted2:    #6b7685;
+  --muted:     #575e66;
+  --muted2:    #525a65;
   --accent:    #4a9eff;
   --accent-dim:#4a9eff12;
   --accent2:   #2c7be5;
@@ -75,7 +75,7 @@ body {
 /* ============================
    SHARED COMPONENTS
    ============================ */
-.page-title-row { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+.page-title-row { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
 .page-title { font-family: 'Bebas Neue', sans-serif; font-size: 1.0rem; letter-spacing: 0.08em; color: var(--text); line-height: 1; }
 .page-title span { color: var(--accent); }
 .page-subtitle { font-family: 'IBM Plex Mono', monospace; font-size: 0.62rem; color: var(--muted); letter-spacing: 0.06em; }
@@ -83,25 +83,26 @@ body {
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; flex-shrink: 0; }
 
 .card-header {
-  display: flex; align-items: center; padding: 9px 14px;
-  border-bottom: 1px solid var(--border); gap: 10px; background: var(--surface2);
+  display: flex; align-items: center; padding: 0 16px;
+  height: 38px; flex-shrink: 0;
+  border-bottom: 1px solid var(--border); gap: 8px; background: var(--surface2);
 }
 .card-title {
   font-family: 'IBM Plex Mono', monospace; font-size: 0.62rem;
   font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted2);
 }
 .card-title-accent { color: var(--accent); }
-.card-actions-right { margin-left: auto; display: flex; align-items: center; gap: 6px; }
-.card-body { padding: 14px; }
+.card-actions-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.card-body { padding: 16px; }
 
 /* Buttons */
 .btn {
   font-family: 'IBM Plex Sans', sans-serif; font-weight: 500; font-size: 0.75rem;
-  border-radius: 3px; padding: 6px 14px; cursor: pointer; border: 1px solid transparent;
-  transition: all 0.12s; display: inline-flex; align-items: center; gap: 5px;
+  border-radius: 3px; padding: 8px 16px; cursor: pointer; border: 1px solid transparent;
+  transition: all 0.12s; display: inline-flex; align-items: center; gap: 4px;
   letter-spacing: 0.02em; white-space: nowrap;
 }
-.btn-primary { background: var(--accent); color: #07101f; font-weight: 600; border-color: var(--accent); }
+.btn-primary { background: var(--accent); color: #ffffff; font-weight: 600; border-color: var(--accent); }
 .btn-primary:hover { filter: brightness(1.1); }
 .btn-secondary { background: var(--surface2); color: var(--muted2); border-color: var(--border2); }
 .btn-secondary:hover { color: var(--text); border-color: var(--muted); }
@@ -112,9 +113,9 @@ body {
 
 /* Badges */
 .badge {
-  display: inline-flex; align-items: center; gap: 5px;
+  display: inline-flex; align-items: center; gap: 4px;
   font-family: 'IBM Plex Mono', monospace; font-size: 0.6rem; font-weight: 600;
-  letter-spacing: 0.06em; padding: 2px 7px; border-radius: 2px; text-transform: uppercase;
+  letter-spacing: 0.06em; padding: 4px 8px; border-radius: 2px; text-transform: uppercase;
 }
 .badge::before { content: ''; width: 4px; height: 4px; border-radius: 50%; }
 .badge-active  { color: var(--success); background: rgba(74,158,255,0.08);  border: 1px solid rgba(74,158,255,0.2); }

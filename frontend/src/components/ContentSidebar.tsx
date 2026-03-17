@@ -389,7 +389,7 @@ const HistorySidebarPanel: React.FC<{
         <div className="sidebar-label">Filter by Model</div>
         <div onClick={() => onSelectModel?.('all')}>
           <PassiveSidebarItem
-            item={{ label: 'All Models', active: activeModel === 'all', color: 'var(--muted)' }}
+            item={{ label: 'All Models', active: activeModel === 'all' }}
           />
         </div>
         {modelOptions.map((item) => (

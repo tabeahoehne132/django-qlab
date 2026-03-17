@@ -7,7 +7,7 @@
 }
 
 .csidebar-head {
-  padding: 14px 14px 10px;
+  padding: 16px 16px 12px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
@@ -15,11 +15,11 @@
 .csidebar-context {
   font-family: 'IBM Plex Mono', monospace;
   font-size: 0.6rem; font-weight: 600; letter-spacing: 0.12em;
-  text-transform: uppercase; color: var(--muted); margin-bottom: 2px;
+  text-transform: uppercase; color: var(--muted); margin-bottom: 4px;
 }
 
 .csidebar-env {
-  display: flex; align-items: center; gap: 6px;
+  display: flex; align-items: center; gap: 8px;
   font-family: 'IBM Plex Mono', monospace;
   font-size: 0.7rem; color: var(--text); font-weight: 500;
 }
@@ -29,15 +29,15 @@
   background: var(--success); box-shadow: 0 0 4px var(--success); flex-shrink: 0;
 }
 
-.csidebar-body { padding: 14px 10px; display: flex; flex-direction: column; gap: 16px; flex: 1; }
+.csidebar-body { padding: 16px 12px; display: flex; flex-direction: column; gap: 16px; flex: 1; }
 
 .sidebar-search {
   width: 100%;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   background: var(--surface2);
   border: 1px solid var(--border2);
   border-radius: 4px;
-  padding: 8px 10px;
+  padding: 8px 12px;
   color: var(--text);
   font-family: 'IBM Plex Mono', monospace;
   font-size: 0.7rem;
@@ -51,19 +51,19 @@
 .sidebar-label {
   font-family: 'IBM Plex Mono', monospace;
   font-size: 0.58rem; font-weight: 600; letter-spacing: 0.12em;
-  text-transform: uppercase; color: var(--muted); padding: 0 4px; margin-bottom: 5px;
+  text-transform: uppercase; color: var(--muted); padding: 4px; margin-bottom: 4px;
 }
 
 .res-item {
-  display: flex; align-items: flex-start; gap: 8px;
-  padding: 6px 6px; border-radius: 4px; cursor: pointer;
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 4px; border-radius: 4px; cursor: pointer;
   transition: background 0.12s; border: 1px solid transparent;
   min-width: 0;
 }
 .res-item:hover { background: var(--surface2); }
 .res-item.active { background: var(--accent-dim); border-color: rgba(74,158,255,0.18); }
 
-.res-pip { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+.res-pip { width: 4px; height: 4px; border-radius: 50%; flex-shrink: 0; }
 .res-item.active .res-pip { box-shadow: 0 0 4px currentColor; }
 
 .res-name {
@@ -84,12 +84,11 @@
   background: transparent;
   color: var(--muted);
   cursor: pointer;
-  font-size: 0.72rem;
+  font-size: 0.82rem;
   padding: 0;
   opacity: 0.7;
   flex-shrink: 0;
-  align-self: flex-start;
-  margin-top: 1px;
+  align-self: center;
 }
 
 .favorite-btn.active {
@@ -98,7 +97,7 @@
 }
 
 .model-group + .model-group {
-  margin-top: 10px;
+  margin-top: 8px;
 }
 
 .sidebar-subgroup {
@@ -117,11 +116,11 @@
   color: var(--muted);
 }
 
-.sidebar-divider { height: 1px; background: var(--border); margin: 2px 0 6px; }
+.sidebar-divider { height: 1px; background: var(--border); margin: 4px 0 8px; }
 
 .recent-item {
-  padding: 7px 6px; border-radius: 4px; cursor: pointer;
-  transition: background 0.12s; margin-bottom: 1px; border: 1px solid transparent;
+  padding: 8px; border-radius: 4px; cursor: pointer;
+  transition: background 0.12s; margin-bottom: 0; border: 1px solid transparent;
 }
 .recent-item:hover { background: var(--surface2); border-color: var(--border); }
 .recent-item.active { background: var(--accent-dim); border-color: rgba(74,158,255,0.18); }
@@ -147,27 +146,27 @@
   word-break: break-word;
 }
 
-.csidebar-footer { padding: 10px; border-top: 1px solid var(--border); flex-shrink: 0; }
+.csidebar-footer { padding: 12px; border-top: 1px solid var(--border); flex-shrink: 0; }
 
 .info-box {
   background: var(--surface2); border: 1px solid var(--border2);
   border-left: 2px solid var(--accent2); border-radius: 4px;
-  padding: 9px 10px; font-size: 0.72rem; color: var(--muted2); line-height: 1.55;
+  padding: 8px 12px; font-size: 0.72rem; color: var(--muted2); line-height: 1.55;
 }
 .info-box strong {
   font-weight: 600; color: var(--accent2); display: block;
-  margin-bottom: 3px; font-size: 0.65rem; letter-spacing: 0.06em; text-transform: uppercase;
+  margin-bottom: 4px; font-size: 0.65rem; letter-spacing: 0.06em; text-transform: uppercase;
 }
 
 .sidebar-panel { display: flex; flex-direction: column; height: 100%; flex: 1; }
 .sidebar-panel.active { display: flex; }
 
 .docs-sidebar-body {
-  gap: 22px;
+  gap: 24px;
 }
 
 .docs-sidebar-divider {
-  margin: 6px 4px 0;
+  margin: 8px 4px 0;
 }
 
 .docs-sidebar-group .res-item {
@@ -185,7 +184,7 @@
   }
 
   .csidebar-body {
-    padding: 10px;
+    padding: 12px;
   }
 
   .csidebar-footer {
