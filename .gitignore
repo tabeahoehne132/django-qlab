@@ -5,7 +5,7 @@ __pycache__/
 
 frontend/node_modules/
 frontend/dist/
-.claude/
+dist/
 .local-consumer/
 .local-demo/
 

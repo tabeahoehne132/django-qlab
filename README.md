@@ -251,33 +251,6 @@ npm run dev       # dev server with HMR
 npm run build     # write compiled assets to qlab/static/qlab/
 ```
 
-Or use the helper script from the repo root:
-
-```bash
-./scripts/build_package_ui.sh
-```
-
----
-
-## Release
-
-1. Bump the version in `pyproject.toml` and `setup.py`
-2. Run the release preparation script:
-
-```bash
-./scripts/prepare_release.sh <version>
-```
-
-3. Commit, tag and push to GitHub
-4. Create the GitHub release
-5. Publish to PyPI:
-
-```bash
-./scripts/publish_pypi.sh
-```
-
-See [docs/release-process.md](docs/release-process.md) for detailed guidance.
-
 ---
 
 ## Local demo
