@@ -1,9 +1,14 @@
 # django-qlab
 
-Packaged QLab for Django REST Framework: dynamic querying, metadata discovery, saved queries, history, and a bundled React UI.
+Dynamic query API and bundled React UI for Django REST Framework.
+Inspect model data, run filtered queries, save and replay them — no custom views required.
 
-Repository:
-[https://github.com/tabeahoehne132/django-qlab](https://github.com/tabeahoehne132/django-qlab)
+[![PyPI version](https://img.shields.io/pypi/v/django-qlab)](https://pypi.org/project/django-qlab/)
+[![Python](https://img.shields.io/pypi/pyversions/django-qlab)](https://pypi.org/project/django-qlab/)
+[![Django](https://img.shields.io/badge/django-4.0%2B-green)](https://pypi.org/project/django-qlab/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
+---
 
 ## Screenshots
 
@@ -15,27 +20,33 @@ Query builder:
 
 ![QLab query builder](docs/screenshots/qlab-query-builder.svg)
 
+---
+
 ## What ships
 
-- Dynamic model querying with field selection and nested filters
-- Metadata endpoint for fields, relations, operators and autocomplete
+- Dynamic model querying with field selection and nested AND / OR / NOT filters
+- Metadata endpoint — fields, types, relations, operators and autocomplete
 - Neighborhood endpoint for relation exploration
-- Bundled React + TypeScript UI under `qlab.urls`
-- Saved queries, run history and per-user UI settings
-- Django admin integration for QLab persistence models
+- Bundled React + TypeScript UI served directly from `qlab.urls`
+- Saved queries with create, update, delete and bulk operations
+- Query run history with replay and save-from-history
+- Per-user settings stored in the database
+- Django admin integration for all persistence models
+
+---
 
 ## Install
 
-Normal package consumers do not need `vite`, `npm run dev`, or a frontend build. The published Python package already ships the compiled UI assets.
-
 ```bash
-pip install git+https://github.com/tabeahoehne132/django-qlab.git
+pip install django-qlab
 ```
 
-Add the app:
+Add the required apps:
 
 ```python
+# settings.py
 INSTALLED_APPS = [
+    ...
     "django.contrib.staticfiles",
     "rest_framework",
     "drf_spectacular",
@@ -43,183 +54,133 @@ INSTALLED_APPS = [
 ]
 ```
 
-Mount the packaged UI:
+Mount the URLs:
 
 ```python
+# urls.py
 from django.urls import include, path
 
 urlpatterns = [
+    ...
     path("qlab/", include("qlab.urls")),
 ]
 ```
 
-Optional: enforce a login redirect for the packaged UI by subclassing `QLabView`:
+Run migrations and collect static files:
+
+```bash
+python manage.py migrate
+python manage.py collectstatic
+```
+
+Open `/qlab/` in your browser — done.
+
+---
+
+## Setup in 5 steps
+
+1. `pip install django-qlab`
+2. Add `qlab` (and its dependencies) to `INSTALLED_APPS`
+3. Include `qlab.urls` in your URL config
+4. `python manage.py migrate && python manage.py collectstatic`
+5. Open `/qlab/`
+
+No separate frontend server. No npm. The compiled UI ships with the package.
+
+---
+
+## Optional: login protection
+
+Subclass `QLabView` to enforce authentication on the UI entrypoint:
 
 ```python
-from django.urls import include, path
+# urls.py
 from django.contrib.auth.mixins import LoginRequiredMixin
-from rest_framework import permissions
-
+from django.urls import include, path
 from qlab.views import QLabView
-from qlab.api_views import QLabFrontendApiViewSet
-
 
 class SecuredQLabView(LoginRequiredMixin, QLabView):
-    login_url = "/django/admin/login/"
+    login_url = "/admin/login/"
 
+urlpatterns = [
+    path("qlab/", SecuredQLabView.as_view(), name="qlab"),
+    path("qlab/", include("qlab.urls")),
+]
+```
+
+---
+
+## Optional: queryset scoping
+
+Override `QLabFrontendApiViewSet` to scope queries per user, tenant or business group:
+
+```python
+from rest_framework import permissions
+from qlab.api_views import QLabFrontendApiViewSet
 
 class ScopedQLabViewSet(QLabFrontendApiViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self, model):
-        return model.objects.filter(business_group=self.request.user.business_group)
+        return model.objects.filter(tenant=self.request.user.tenant)
+```
 
+Then mount the scoped ViewSet before the default `qlab.urls` include:
 
+```python
 urlpatterns = [
     path("qlab/", SecuredQLabView.as_view(), name="qlab"),
+    path("qlab/api/query/", ScopedQLabViewSet.as_view({"post": "post"}), name="qlab-query"),
     path("qlab/", include("qlab.urls")),
-    path(
-        "qlab/api/query/",
-        ScopedQLabViewSet.as_view({"post": "post"}),
-        name="qlab-custom-query",
-    ),
 ]
 ```
 
-Use the custom `QLabFrontendApiViewSet` only if you need queryset scoping per user, tenant, or business group.
+---
 
-Collect static files if your project requires it:
+## Settings
 
-```bash
-python manage.py collectstatic
+Add a `QLAB_SETTINGS` dict to your Django settings to override defaults:
+
+```python
+# settings.py
+QLAB_SETTINGS = {
+    "DEFAULT_APP_LABEL": "myapp",   # pre-select this app in the UI
+    "PAGE_SIZE": 100,               # default page size
+    "MAX_PAGE_SIZE": 500,           # hard cap per request
+    "MAX_RELATION_DEPTH": 2,        # how deep relation graphs expand
+    "MAX_FILTER_CONDITIONS": 10,    # max filter nodes per query
+    "MAX_NODES": 100,               # max records returned by neighborhood
+    "ALLOWED_APPS": [],             # restrict to specific app labels (empty = all)
+    "RESTRICTED_MODELS": [],        # block specific model names globally
+}
 ```
 
-Then open `/qlab/` in your Django project.
-
-## Consumer flow
-
-For users of the package, the setup is only:
-
-1. `pip install django-qlab`
-2. add `qlab` to `INSTALLED_APPS`
-3. include `qlab.urls`
-4. run `collectstatic`
-5. open `/qlab/`
-
-No separate frontend server is required.
+---
 
 ## API surface
 
-Built-in routes exposed by `qlab.urls`:
+All routes are mounted relative to the prefix you chose (e.g. `/qlab/`):
 
-- `POST /qlab/api/query/`
-- `POST /qlab/api/metadata/`
-- `POST /qlab/api/neighborhood/`
-- `GET /qlab/api/bootstrap/`
-- `GET/PATCH /qlab/api/settings/`
-- `GET/POST /qlab/api/saved-queries/`
-- `GET/PATCH/DELETE /qlab/api/saved-queries/<id>/`
-- `POST /qlab/api/saved-queries/<id>/run/`
-- `GET /qlab/api/history/`
-- `GET /qlab/`
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/` | Bundled React UI |
+| `GET` | `/api/bootstrap/` | Initial data load (models, settings) |
+| `POST` | `/api/query/` | Run a filtered, paginated query |
+| `POST` | `/api/metadata/` | Model field and relation schema |
+| `POST` | `/api/neighborhood/` | Relation graph for a set of records |
+| `GET / PATCH` | `/api/settings/` | Per-user UI settings |
+| `GET / POST` | `/api/saved-queries/` | List and create saved queries |
+| `GET / PATCH / DELETE` | `/api/saved-queries/<id>/` | Manage a single saved query |
+| `POST` | `/api/saved-queries/<id>/run/` | Execute a saved query |
+| `GET` | `/api/history/` | Query run history |
 
-## UI capabilities
-
-- Home dashboard with model counts, saved-query count and activity snapshot
-- Query builder with:
-  - field picker
-  - nested `(a or b) and (x or y)` groups
-  - CSV export
-  - JSON copy
-- Models browser with field and relation inspection
-- Saved queries tab with create, update, delete, bulk delete and run
-- History tab with replay, save-from-history and sidebar filters
-- Docs and settings views
-- First-use onboarding tour
-- Light and dark mode
-
-## Local frontend development
-
-This section is only for maintainers working on the packaged UI itself.
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-To rebuild the bundled assets into `qlab/static/qlab/`:
-
-```bash
-cd frontend
-npm run build
-```
-
-Or use the helper script from the repo root:
-
-```bash
-./scripts/build_package_ui.sh
-```
-
-## Maintainer release flow
-
-Before publishing a new package version:
-
-1. bump the version in `pyproject.toml` and `setup.py`
-2. prepare the release:
-
-```bash
-./scripts/prepare_release.sh <version>
-```
-
-3. commit the prepared release state
-4. tag and push it to GitHub
-5. create the GitHub release
-6. publish to PyPI:
-
-```bash
-./scripts/publish_pypi.sh
-```
-
-The frontend build is done by the package maintainer, not by package consumers.
-
-Detailed release guidance:
-
-- [docs/release-process.md](docs/release-process.md)
-- [docs/release-notes-v0.3.0.md](docs/release-notes-v0.3.0.md)
-
-## Local demo project
-
-A gitignored local demo project lives in `.local-demo/`.
-
-Run it like this:
-
-```bash
-cd .local-demo
-python manage.py migrate
-python manage.py seed_demo_data
-python manage.py runserver 8054
-```
-
-Then open:
-
-[http://127.0.0.1:8054/qlab/](http://127.0.0.1:8054/qlab/)
-
-## Admin
-
-The package registers these models in Django admin:
-
-- `QLabUserSettings`
-- `SavedQuery`
-- `QueryRunHistory`
-
-## Example query payload
+### Example query payload
 
 ```json
 {
   "model": "Device",
-  "app_label": "demoapp",
-  "select_fields": ["id", "name", "status"],
+  "app_label": "myapp",
+  "select_fields": ["id", "name", "status", "region"],
   "filter_fields": {
     "and_operation": [
       {
@@ -241,17 +202,99 @@ The package registers these models in Django admin:
 }
 ```
 
-## Optional settings
+---
 
-```python
-QLAB_SETTINGS = {
-    "DEFAULT_APP_LABEL": "myapp",
-    "PAGE_SIZE": 100,
-    "MAX_PAGE_SIZE": 500,
-    "MAX_RELATION_DEPTH": 2,
-    "MAX_FILTER_CONDITIONS": 10,
-    "MAX_NODES": 100,
-    "ALLOWED_APPS": [],
-    "RESTRICTED_MODELS": [],
-}
+## UI capabilities
+
+- **Dashboard** — model counts, saved query count and recent activity
+- **Query builder** — field picker, nested `(a or b) and (x or y)` filter groups, CSV export, JSON copy
+- **Models browser** — field types, nullability, filterable flags, relation inspection
+- **Saved queries** — create, update, delete, bulk delete and run from the UI
+- **History** — replay past runs, save from history, filter by model and time range
+- **Settings** — page size, default app, theme
+- **Light and dark mode**
+
+---
+
+## Django admin
+
+The package registers the following models in Django admin:
+
+| Model | Description |
+|---|---|
+| `QLabUserSettings` | Per-user theme, page size and active tab |
+| `SavedQuery` | Stored query payloads with metadata |
+| `QueryRunHistory` | Execution log with status, duration and result snapshot |
+
+---
+
+## Requirements
+
+| Package | Version |
+|---|---|
+| Python | ≥ 3.9 |
+| Django | ≥ 4.0 |
+| djangorestframework | ≥ 3.14 |
+| pydantic | ≥ 2.0 |
+| drf-spectacular | ≥ 0.26 |
+
+---
+
+## Frontend development
+
+This section is for maintainers working on the UI itself. Package consumers do not need npm.
+
+```bash
+cd frontend
+npm install
+npm run dev       # dev server with HMR
+npm run build     # write compiled assets to qlab/static/qlab/
 ```
+
+Or use the helper script from the repo root:
+
+```bash
+./scripts/build_package_ui.sh
+```
+
+---
+
+## Release
+
+1. Bump the version in `pyproject.toml` and `setup.py`
+2. Run the release preparation script:
+
+```bash
+./scripts/prepare_release.sh <version>
+```
+
+3. Commit, tag and push to GitHub
+4. Create the GitHub release
+5. Publish to PyPI:
+
+```bash
+./scripts/publish_pypi.sh
+```
+
+See [docs/release-process.md](docs/release-process.md) for detailed guidance.
+
+---
+
+## Local demo
+
+A gitignored demo project lives in `.local-demo/`:
+
+```bash
+cd .local-demo
+python manage.py migrate
+python manage.py seed_demo_data
+python manage.py runserver 8054
+```
+
+Then open [http://127.0.0.1:8054/qlab/](http://127.0.0.1:8054/qlab/).
+
+---
+
+## License
+
+MIT
