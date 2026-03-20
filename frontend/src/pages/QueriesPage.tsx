@@ -1456,7 +1456,6 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
       {results && (
         <div
           className="card animate-in query-results-card"
-          style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
         >
           <div className="results-meta">
             <span className="result-count">{results.count}</span>

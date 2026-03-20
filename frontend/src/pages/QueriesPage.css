@@ -10,7 +10,7 @@
 }
 .tab-panel.active { display: flex; }
 .queries-page {
-  overflow: hidden;
+  overflow-y: auto;
   min-height: 0;
 }
 
@@ -88,7 +88,11 @@
 }
 
 .query-results-card {
-  min-height: 0;
+  height: 500px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .field-picker-overlay {

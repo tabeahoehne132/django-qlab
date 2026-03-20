@@ -61,6 +61,20 @@ class FieldMetadataSerializer(serializers.Serializer):
         allow_null=True,
         help_text="Available choices as {value, label} pairs (choice fields only)",
     )
+    help_text = serializers.CharField(
+        default="",
+        allow_blank=True,
+        llow_null=True,
+        help_text="Django field help_text — human-readable description of the field",
+    )
+    blank = serializers.BooleanField(
+        default=False,
+        help_text="True if the field accepts empty/blank values",
+    )
+    null = serializers.BooleanField(
+        default=False,
+        help_text="True if the field stores NULL in the database",
+    )
 
 
 class ModelMetadataSerializer(serializers.Serializer):

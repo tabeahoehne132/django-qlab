@@ -25,6 +25,7 @@ class QLabUserSettings(models.Model):
     class Meta:
         verbose_name = "QLab user settings"
         verbose_name_plural = "QLab user settings"
+        app_label = "qlab"
 
     def __str__(self) -> str:
         return f"QLab settings for {self.user}"
@@ -50,6 +51,7 @@ class SavedQuery(models.Model):
     class Meta:
         ordering = ["name", "-updated_at"]
         unique_together = ("user", "name")
+        app_label = "qlab"
 
     def __str__(self) -> str:
         return f"{self.name} ({self.model_name})"
@@ -88,6 +90,7 @@ class QueryRunHistory(models.Model):
         ordering = ["-created_at"]
         verbose_name = "QLab query run"
         verbose_name_plural = "QLab query runs"
+        app_label = "qlab"
 
     def __str__(self) -> str:
         return f"{self.model_name} ({self.status})"
