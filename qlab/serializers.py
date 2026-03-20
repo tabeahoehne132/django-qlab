@@ -64,7 +64,7 @@ class FieldMetadataSerializer(serializers.Serializer):
     help_text = serializers.CharField(
         default="",
         allow_blank=True,
-        llow_null=True,
+        allow_null=True,
         help_text="Django field help_text — human-readable description of the field",
     )
     blank = serializers.BooleanField(
