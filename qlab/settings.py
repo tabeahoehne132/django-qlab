@@ -18,7 +18,6 @@ QLAB_DEFAULTS = {
     "MAX_NODES": 100,
     "MAX_HISTORY_ROWS": 100,
     "ALLOWED_APPS": [],
-    "RESTRICTED_MODELS": [],
     "INCLUDE_MODEL_COUNTS": False,
     "ENVIRONMENT_LABEL": "Production",
 }

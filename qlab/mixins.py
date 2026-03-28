@@ -53,10 +53,26 @@ _ERROR_SCHEMA = inline_serializer(
 )
 
 
-def _check_restricted(model_name: str) -> Optional[Response]:
+def _check_restricted(
+    model_name: str, app_label: str, user: object
+) -> Optional[Response]:
     """Return a 403 Response if the model is restricted, else None."""
-    restricted = [m.lower() for m in (qlab_settings.RESTRICTED_MODELS or [])]
-    if model_name.lower() in restricted:
+    from qlab.models import ModelRegistry
+
+    model_obj = ModelRegistry.objects.filter(
+        model_name__iexact=model_name, app_label=app_label
+    ).first()
+    print(model_obj)
+    if not model_obj or model_obj.status != "enabled":
+        restricted = True
+    elif model_obj.is_restricted:
+        restricted = not model_obj.allowed_groups.filter(
+            pk__in=user.groups.all()
+        ).exists()
+    else:
+        restricted = False
+
+    if restricted:
         return Response(
             {
                 "errors": [
@@ -237,7 +253,7 @@ class QLabMixin:
                 error_message=f"App '{app_label}' is not enabled for QLab.",
             )
             return allowed_app
-        restricted = _check_restricted(query.model)
+        restricted = _check_restricted(query.model, app_label, request.user)
         if restricted:
             _record_query_history(
                 request,
@@ -556,7 +572,7 @@ class NeighborhoodMixin:
         allowed_app = _check_allowed_app(app_label)
         if allowed_app:
             return allowed_app
-        restricted = _check_restricted(model_name)
+        restricted = _check_restricted(model_name, app_label, request.user)
         if restricted:
             return restricted
         try:
@@ -715,7 +731,7 @@ class QLabMetadataMixin:
         allowed_app = _check_allowed_app(app_label)
         if allowed_app:
             return allowed_app
-        restricted = _check_restricted(model_name)
+        restricted = _check_restricted(model_name, app_label, request.user)
         if restricted:
             return restricted
 

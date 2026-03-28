@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from qlab.models import QLabUserSettings, QueryRunHistory, SavedQuery
+from qlab.models import ModelRegistry, QLabUserSettings, QueryRunHistory, SavedQuery
 
 
 @admin.register(QLabUserSettings)
@@ -53,3 +53,49 @@ class QueryRunHistoryAdmin(admin.ModelAdmin):
     )
     list_filter = ("status", "app_label", "model_name", "created_at")
     readonly_fields = ("created_at",)
+
+
+@admin.action(description="Enable selected models")
+def enable_models(modeladmin, request, queryset):
+    queryset.update(status="enabled")
+
+
+@admin.action(description="Disable selected models")
+def disable_models(modeladmin, request, queryset):
+    queryset.update(status="disabled")
+
+
+@admin.action(description="Restrict selected models")
+def restrict_models(modeladmin, request, queryset):
+    queryset.update(is_restricted=True)
+
+
+@admin.action(description="Allow selected models")
+def allow_models(modeladmin, request, queryset):
+    queryset.update(is_restricted=False)
+
+
+@admin.register(ModelRegistry)
+class ModelRegistryAdmin(admin.ModelAdmin):
+    list_display = (
+        "created_at",
+        "updated_at",
+        "app_label",
+        "model_name",
+        "status",
+        "is_restricted",
+    )
+    search_fields = (
+        "app_label",
+        "model_name",
+    )
+    list_filter = ("status", "is_restricted", "app_label")
+    readonly_fields = (
+        "model_label",
+        "app_label",
+        "model_name",
+        "created_at",
+        "updated_at",
+    )
+    filter_horizontal = ("allowed_groups",)
+    actions = [enable_models, disable_models, restrict_models, allow_models]

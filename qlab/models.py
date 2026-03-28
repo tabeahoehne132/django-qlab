@@ -94,3 +94,35 @@ class QueryRunHistory(models.Model):
 
     def __str__(self) -> str:
         return f"{self.model_name} ({self.status})"
+
+
+class ModelRegistry(models.Model):
+    STATUS_CHOICES = [
+        ("enabled", "Enabled"),
+        ("disabled", "Disabled"),
+        ("submitted", "Submitted"),
+    ]
+
+    created_at = models.DateTimeField(auto_now_add=True, editable=False)
+    updated_at = models.DateTimeField(auto_now=True, editable=False)
+    model_label = models.CharField(max_length=500, unique=True)
+    app_label = models.CharField(max_length=250)
+    model_name = models.CharField(max_length=250)
+    status = models.CharField(
+        max_length=16, choices=STATUS_CHOICES, default="submitted"
+    )
+    is_restricted = models.BooleanField(default=False)
+    allowed_groups = models.ManyToManyField(
+        "auth.Group",
+        blank=True,
+        related_name="registered_models",
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Model Registry"
+        verbose_name_plural = "Model Registry"
+        app_label = "qlab"
+
+    def __str__(self) -> str:
+        return f"{self.model_label}"
