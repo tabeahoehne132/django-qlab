@@ -10,18 +10,6 @@ Inspect model data, run filtered queries, save and replay them — no custom vie
 
 ---
 
-## Screenshots
-
-Dashboard:
-
-![QLab dashboard](docs/screenshots/qlab-dashboard.svg)
-
-Query builder:
-
-![QLab query builder](docs/screenshots/qlab-query-builder.svg)
-
----
-
 ## What ships
 
 - Dynamic model querying with field selection and nested AND / OR / NOT filters
