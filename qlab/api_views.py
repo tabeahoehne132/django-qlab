@@ -170,6 +170,7 @@ class QLabBootstrapViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
                 },
                 "settings": QLabUserSettingsSerializer(settings_obj).data,
                 "config": {
+                    "environment": qlab_settings.ENVIRONMENT_LABEL,
                     "metadata": {
                         "relation_depth": qlab_settings.METADATA_MAX_RELATION_DEPTH,
                         "include_reverse_relations": qlab_settings.METADATA_INCLUDE_REVERSE_RELATIONS,

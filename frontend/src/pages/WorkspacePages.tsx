@@ -436,8 +436,8 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({
 
       <div className="workspace-stack models-stack animate-in">
         <ModelInspectPanel
-          modelName={active.name}
-          modelLabel={active.displayName || getReadableModelLabel(active.name)}
+          modelName={active.rawModelName || active.name}
+          modelLabel={active.displayName || getReadableModelLabel(active.rawModelName || active.name)}
           appLabel={active.appLabel}
           metadata={activeMetadata}
           modelsIndex={modelsIndex}

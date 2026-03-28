@@ -26,6 +26,7 @@ import {
   getHistory,
   getModelMetadata,
   markSavedQueryRun,
+  modelKey,
   patchSettings,
   runQuery,
   updateSavedQuery,
@@ -294,6 +295,7 @@ export default function App() {
   const [isBootstrapping, setIsBootstrapping] = useState(true)
   const [bootstrapError, setBootstrapError] = useState<string | null>(null)
   const [bootstrapConfig, setBootstrapConfig] = useState({
+    environment: '',
     metadata: {
       relation_depth: 1,
       include_reverse_relations: false,
@@ -346,7 +348,7 @@ export default function App() {
         setHistoryItems(bootstrap.history)
         setSavedQueries(bootstrap.saved_queries)
         setActiveSavedQueryId(bootstrap.saved_queries[0]?.id ?? null)
-        setActiveModel(bootstrap.models[0]?.model_name || '')
+        setActiveModel(bootstrap.models[0] ? modelKey(bootstrap.models[0].app_label, bootstrap.models[0].model_name) : '')
         setActiveTab(normalizeTab(bootstrap.settings.last_active_tab))
         setActiveDocsKey(bootstrap.settings.active_docs_key || 'overview')
         setDefaultPageSize(bootstrap.settings.default_page_size || 100)
@@ -408,8 +410,8 @@ export default function App() {
     theme,
   ])
 
-  const activeModelEntry = bootstrapModels.find((model) => model.model_name === activeModel)
-  const activeMetadataKey = activeModel ? getMetadataCacheKey(activeModel, activeModelEntry?.app_label) : ''
+  const activeModelEntry = bootstrapModels.find((model) => modelKey(model.app_label, model.model_name) === activeModel)
+  const activeMetadataKey = activeModelEntry ? getMetadataCacheKey(activeModelEntry.model_name, activeModelEntry.app_label) : ''
   const activeMetadata = activeMetadataKey ? metadataByKey[activeMetadataKey] : undefined
 
   const loadMetadata = async (modelName: string, appLabel?: string) => {
@@ -440,7 +442,8 @@ export default function App() {
 
     const preloadMetadata = async () => {
       try {
-        await loadMetadata(activeModel, activeModelEntry?.app_label)
+        if (!activeModelEntry) return
+        await loadMetadata(activeModelEntry.model_name, activeModelEntry.app_label)
       } catch (error) {
         console.error(error)
       }
@@ -488,7 +491,7 @@ export default function App() {
   const handleRecentQuerySelect = (query: RecentQuery) => {
     const match = bootstrapModels.find((model) => model.model_name === query.modelName)
     if (match) {
-      handleModelSelect(match.model_name)
+      handleModelSelect(modelKey(match.app_label, match.model_name))
     }
     setActiveTab('queries')
   }
@@ -496,7 +499,7 @@ export default function App() {
   const handleReplayQuery = (item: HistoryItem) => {
     const model = bootstrapModels.find((entry) => entry.model_name === item.model)
     if (model) {
-      handleModelSelect(model.model_name)
+      handleModelSelect(modelKey(model.app_label, model.model_name))
     }
     if (item.queryPayload) {
       setQueryPreset(item.queryPayload as unknown as QueryRequest)
@@ -505,9 +508,9 @@ export default function App() {
   }
 
   const handleOpenSavedQuery = (query: SavedQuery) => {
-    const model = bootstrapModels.find((entry) => entry.model_name === query.model_name)
+    const model = bootstrapModels.find((entry) => entry.model_name === query.model_name && entry.app_label === query.app_label)
     if (model) {
-      handleModelSelect(model.model_name)
+      handleModelSelect(modelKey(model.app_label, model.model_name))
     }
     setQueryPreset({
       ...(query.query_payload as unknown as QueryRequest),
@@ -526,9 +529,9 @@ export default function App() {
         ? { ...entry, last_run_at: new Date().toISOString() }
         : entry
     )))
-    const model = bootstrapModels.find((entry) => entry.model_name === query.model_name)
+    const model = bootstrapModels.find((entry) => entry.model_name === query.model_name && entry.app_label === query.app_label)
     if (model) {
-      handleModelSelect(model.model_name)
+      handleModelSelect(modelKey(model.app_label, model.model_name))
     }
     setQueryPreset({
       ...(query.query_payload as unknown as QueryRequest),
@@ -559,12 +562,13 @@ export default function App() {
     const metadata = metadataByKey[getMetadataCacheKey(model.model_name, model.app_label)]
     const directFields = getDirectFields(metadata)
     return {
-      name: model.model_name,
+      name: modelKey(model.app_label, model.model_name),
+      rawModelName: model.model_name,
       displayName: getModelDisplayLabel(model),
       count: model.count || 0,
       color: colors[index % colors.length],
       appLabel: model.app_label,
-      favorite: favoriteModels.includes(model.model_name),
+      favorite: favoriteModels.includes(modelKey(model.app_label, model.model_name)),
       description: model.verbose_name_plural,
       tags: [
         directFields.some((field) => field.allowed_operations.length > 0) ? 'filterable' : 'read-only',
@@ -693,7 +697,7 @@ export default function App() {
         }}
         onToggleModelFavorite={handleToggleModelFavorite}
         onRecentQuerySelect={handleRecentQuerySelect}
-        environment="LOCAL · DEV"
+        environment={bootstrapConfig.environment}
       />
 
       <div className="app-body">
@@ -706,7 +710,7 @@ export default function App() {
         </div>
         {activeTab === 'queries' && (
               <QueriesPage
-                activeModel={activeModel}
+                activeModel={activeModelEntry?.model_name || ''}
                 activeModelLabel={activeModelEntry ? getModelDisplayLabel(activeModelEntry) : activeModel}
                 activeAppLabel={activeModelEntry?.app_label}
                 activeMetadata={activeMetadata}
@@ -771,7 +775,8 @@ export default function App() {
             activeMetadata={activeMetadata}
             onRequestMetadata={loadMetadata}
             onQueryModel={(modelName) => {
-              setActiveModel(modelName)
+              const entry = bootstrapModels.find((m) => m.model_name === modelName)
+              setActiveModel(entry ? modelKey(entry.app_label, entry.model_name) : modelName)
               setActiveTab('queries')
             }}
           />

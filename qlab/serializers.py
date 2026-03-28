@@ -120,7 +120,8 @@ class MetaDataRequestSerializer(serializers.Serializer):
     )
 
     def validate_model(self, value: str) -> str:
-        if not model_exists(value):
+        app_label = self.initial_data.get("app_label")
+        if not model_exists(value, app_label or None):
             raise serializers.ValidationError("This model does not exist.")
         return value
 

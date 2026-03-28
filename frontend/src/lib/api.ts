@@ -52,6 +52,7 @@ export interface BootstrapResponse {
   }
   settings: BootstrapSettings
   config: {
+    environment: string
     metadata: {
       relation_depth: number
       include_reverse_relations: boolean
@@ -167,6 +168,16 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   return payload as T
+}
+
+export function modelKey(appLabel: string, modelName: string): string {
+  return `${appLabel}::${modelName}`
+}
+
+export function parseModelKey(key: string): { appLabel: string; modelName: string } {
+  const idx = key.indexOf('::')
+  if (idx === -1) return { appLabel: '', modelName: key }
+  return { appLabel: key.slice(0, idx), modelName: key.slice(idx + 2) }
 }
 
 export function getBootstrap() {

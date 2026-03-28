@@ -124,10 +124,11 @@ class QueryFilter(BaseModel):
     @field_validator("model")
     def validate_model(cls, model: str) -> str:
         """
-        Validate that the requested model exists.
+        Validate that the requested model exists in any installed app.
 
-        Performs case-insensitive search across all installed Django apps
-        to verify the model is available for querying.
+        Performs a loose case-insensitive check across all apps. The scoped
+        app_label + model lookup happens in validate_fields (model_validator)
+        where both fields are accessible.
 
         Args:
             model: Model name from request
@@ -137,13 +138,8 @@ class QueryFilter(BaseModel):
 
         Raises:
             ValidationError: If model doesn't exist in any app
-
-        Example:
-            >>> QueryFilter(model="Backup", select_fields=["id"], page=1)  # Valid
-            >>> QueryFilter(model="NonExistent", select_fields=["id"], page=1)  # ValidationError
         """
-        model_check = model_exists(model)
-        if not model_check:
+        if not model_exists(model):
             raise ValidationError(
                 [
                     {
@@ -190,9 +186,21 @@ class QueryFilter(BaseModel):
             {'loc': ('filter_fields', 'backup_size'),
             'msg': "Operation 'icontains' is not allowed for field 'backup_size'."}
         """
-        # Get the actual Django model class
+        # Get the actual Django model class — scoped to app_label to handle
+        # duplicate model names across different apps.
         app_label = self.app_label or qlab_settings.DEFAULT_APP_LABEL
-        model = apps.get_model(app_label, self.model)
+        try:
+            model = apps.get_model(app_label, self.model)
+        except LookupError:
+            raise ValidationError(
+                [
+                    {
+                        "loc": ("model",),
+                        "msg": f"Model '{self.model}' does not exist in app '{app_label}'.",
+                        "type": "value_error",
+                    }
+                ]
+            )
         errors = []
 
         # --- Validate Select Fields ---

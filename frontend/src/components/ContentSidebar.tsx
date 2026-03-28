@@ -4,6 +4,7 @@ import './ContentSidebar.css'
 
 export interface ModelEntry {
   name: string
+  rawModelName?: string
   displayName?: string
   count: number
   color: string

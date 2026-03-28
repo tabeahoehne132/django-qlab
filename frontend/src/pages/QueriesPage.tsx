@@ -61,6 +61,7 @@ interface FieldAutocompleteProps {
   className?: string
   autoFocus?: boolean
   compact?: boolean
+  excludeFields?: string[]
   onChange: (value: string) => void
   onRequestMetadata: (modelName: string, appLabel?: string) => Promise<MetadataResponse>
   onSubmit?: (value: string) => void
@@ -386,6 +387,7 @@ const FieldAutocomplete: React.FC<FieldAutocompleteProps> = ({
   className = '',
   autoFocus = false,
   compact = false,
+  excludeFields,
   onChange,
   onRequestMetadata,
   onSubmit,
@@ -503,7 +505,7 @@ const FieldAutocomplete: React.FC<FieldAutocompleteProps> = ({
           {!loading && !resolution.error && resolution.suggestions.length === 0 && (
             <div className="field-picker-empty">No matching fields.</div>
           )}
-          {!loading && !resolution.error && resolution.suggestions.map((suggestion) => (
+          {!loading && !resolution.error && resolution.suggestions.filter((s) => !excludeFields?.includes(s.path)).map((suggestion) => (
             <button
               key={suggestion.path}
               type="button"
@@ -1277,6 +1279,7 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
                       rootAppLabel={activeAppLabel}
                       rootMetadata={activeMetadata}
                       onRequestMetadata={onRequestMetadata}
+                      excludeFields={selectedFields}
                       onChange={setFieldSearch}
                       onSubmit={(path) => {
                         if (!selectedFields.includes(path)) {

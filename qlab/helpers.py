@@ -624,25 +624,33 @@ def validate_field_path(model, field_path: str, errors: list) -> bool:
 
 
 @lru_cache(maxsize=512)
-def model_exists(model_name: str):
+def model_exists(model_name: str, app_label: str | None = None):
     """
-    Check if a model exists in any installed Django app.
+    Check if a model exists in Django's app registry.
 
-    Case-insensitive search across all registered Django apps.
+    When app_label is provided, uses Django's apps.get_model() for an exact
+    lookup — safe when multiple apps share a model name. Falls back to a
+    case-insensitive search across all apps when no app_label is given.
 
     Args:
         model_name: Name of the model to search for
+        app_label: Optional Django app label for scoped lookup
 
     Returns:
         Model class if found, None otherwise
 
     Example:
-        >>> model = model_exists("Book")
+        >>> model = model_exists("Book", app_label="library")
         >>> model.__name__
         'Book'
         >>> model_exists("NonExistentModel")
         None
     """
+    if app_label:
+        try:
+            return apps.get_model(app_label, model_name)
+        except LookupError:
+            return None
     for app_config in apps.get_app_configs():
         for model in app_config.get_models():
             if model.__name__.lower() == model_name.lower():

@@ -20,6 +20,7 @@ QLAB_DEFAULTS = {
     "ALLOWED_APPS": [],
     "RESTRICTED_MODELS": [],
     "INCLUDE_MODEL_COUNTS": False,
+    "ENVIRONMENT_LABEL": "Production",
 }
 
 

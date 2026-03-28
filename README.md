@@ -152,6 +152,7 @@ QLAB_SETTINGS = {
     "MAX_NODES": 100,               # max records returned by neighborhood
     "ALLOWED_APPS": [],             # restrict to specific app labels (empty = all)
     "RESTRICTED_MODELS": [],        # block specific model names globally
+    "ENVIRONMENT_LABEL": "Production", # set qlab env
 }
 ```
 
@@ -250,21 +251,6 @@ npm install
 npm run dev       # dev server with HMR
 npm run build     # write compiled assets to qlab/static/qlab/
 ```
-
----
-
-## Local demo
-
-A gitignored demo project lives in `.local-demo/`:
-
-```bash
-cd .local-demo
-python manage.py migrate
-python manage.py seed_demo_data
-python manage.py runserver 8054
-```
-
-Then open [http://127.0.0.1:8054/qlab/](http://127.0.0.1:8054/qlab/).
 
 ---
 
