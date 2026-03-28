@@ -1,293 +1,259 @@
-# Django QLab
+# django-qlab
 
-A powerful Django REST Framework extension for dynamic model querying with advanced filtering, field selection, and automatic metadata generation.
+Dynamic query API and bundled React UI for Django REST Framework.
+Inspect model data, run filtered queries, save and replay them — no custom views required.
 
-## Features
-
-🚀 **Dynamic Querying**
-- Select specific fields from any model
-- Support for nested relations via `__` syntax
-- Automatic field path validation
-- Reverse relation support
-
-🔍 **Advanced Filtering**
-- Complex AND/OR/NOT operations
-- Type-safe operation validation
-- Support for: `is`, `is_not`, `lt`, `lte`, `gt`, `gte`, `icontains`
-
-🔗 **Neighborhood Resolution**
-- Resolve all FK, OneToOne and M2M relations for a set of records
-- Includes reverse relations with correct query names
-- Useful for building graph-style UIs
-
-📊 **Model Metadata**
-- Automatic field discovery including reverse relations
-- Operation compatibility information
-- `filter_name` for each relation field
-- Perfect for building query UIs with autocomplete
-
-🔒 **Access Control**
-- Restrict specific models from being queried via `RESTRICTED_MODELS`
-- Standard DRF `permission_classes` support on all ViewSets
-
-✅ **Type Safety**
-- Pydantic validation
-- Field type checking
-- Operation compatibility validation
+[![PyPI version](https://img.shields.io/pypi/v/django-qlab)](https://pypi.org/project/django-qlab/)
+[![Python](https://img.shields.io/pypi/pyversions/django-qlab)](https://pypi.org/project/django-qlab/)
+[![Django](https://img.shields.io/badge/django-4.0%2B-green)](https://pypi.org/project/django-qlab/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 ---
 
-## Installation
+## Screenshots
+
+Dashboard:
+
+![QLab dashboard](docs/screenshots/qlab-dashboard.svg)
+
+Query builder:
+
+![QLab query builder](docs/screenshots/qlab-query-builder.svg)
+
+---
+
+## What ships
+
+- Dynamic model querying with field selection and nested AND / OR / NOT filters
+- Metadata endpoint — fields, types, relations, operators and autocomplete
+- Neighborhood endpoint for relation exploration
+- Bundled React + TypeScript UI served directly from `qlab.urls`
+- Saved queries with create, update, delete and bulk operations
+- Query run history with replay and save-from-history
+- Per-user settings stored in the database
+- Django admin integration for all persistence models
+
+---
+
+## Install
 
 ```bash
-pip install git+https://github.com/tabeahoehne132/django-qlab.git
+pip install django-qlab
 ```
 
----
-
-## Quick Start
-
-### 1. Add to INSTALLED_APPS
+Add the required apps:
 
 ```python
+# settings.py
 INSTALLED_APPS = [
     ...
-    'rest_framework',
-    'drf_spectacular',
-    'qlab',
+    "django.contrib.staticfiles",
+    "rest_framework",
+    "drf_spectacular",
+    "qlab",
 ]
 ```
 
-### 2. Configure URLs
-
-Use the provided Mixins to build your own ViewSet with full control over permissions and queryset scoping:
-
-```python
-# views.py
-from rest_framework import viewsets
-from rest_framework.permissions import IsAuthenticated
-from qlab.mixins import QLabMixin, NeighborhoodMixin, QLabMetadataMixin
-
-
-class QLab(QLabMixin, NeighborhoodMixin, QLabMetadataMixin, viewsets.ViewSet):
-    permission_classes = [IsAuthenticated]
-
-    def get_queryset(self, model):
-        # Optional: apply custom scoping per model
-        return model.objects.all()
-```
+Mount the URLs:
 
 ```python
 # urls.py
-from django.urls import path
-from .views import QLab
+from django.urls import include, path
 
 urlpatterns = [
-    path('api/query/',        QLab.as_view({'post': 'post'})),
-    path('api/metadata/',     QLab.as_view({'post': 'metadata'})),
-    path('api/neighborhood/', QLab.as_view({'post': 'neighborhood'})),
+    ...
+    path("qlab/", include("qlab.urls")),
 ]
 ```
 
-### 3. Configure Settings (Optional)
+Run migrations and collect static files:
+
+```bash
+python manage.py migrate
+python manage.py collectstatic
+```
+
+Open `/qlab/` in your browser — done.
+
+---
+
+## Setup in 5 steps
+
+1. `pip install django-qlab`
+2. Add `qlab` (and its dependencies) to `INSTALLED_APPS`
+3. Include `qlab.urls` in your URL config
+4. `python manage.py migrate && python manage.py collectstatic`
+5. Open `/qlab/`
+
+No separate frontend server. No npm. The compiled UI ships with the package.
+
+---
+
+## Optional: login protection
+
+Subclass `QLabView` to enforce authentication on the UI entrypoint:
+
+```python
+# urls.py
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.urls import include, path
+from qlab.views import QLabView
+
+class SecuredQLabView(LoginRequiredMixin, QLabView):
+    login_url = "/admin/login/"
+
+urlpatterns = [
+    path("qlab/", SecuredQLabView.as_view(), name="qlab"),
+    path("qlab/", include("qlab.urls")),
+]
+```
+
+---
+
+## Optional: queryset scoping
+
+Override `QLabFrontendApiViewSet` to scope queries per user, tenant or business group:
+
+```python
+from rest_framework import permissions
+from qlab.api_views import QLabFrontendApiViewSet
+
+class ScopedQLabViewSet(QLabFrontendApiViewSet):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self, model):
+        return model.objects.filter(tenant=self.request.user.tenant)
+```
+
+Then mount the scoped ViewSet before the default `qlab.urls` include:
+
+```python
+urlpatterns = [
+    path("qlab/", SecuredQLabView.as_view(), name="qlab"),
+    path("qlab/api/query/", ScopedQLabViewSet.as_view({"post": "post"}), name="qlab-query"),
+    path("qlab/", include("qlab.urls")),
+]
+```
+
+---
+
+## Settings
+
+Add a `QLAB_SETTINGS` dict to your Django settings to override defaults:
 
 ```python
 # settings.py
 QLAB_SETTINGS = {
-    'DEFAULT_APP_LABEL': 'myapp',
-    'PAGE_SIZE': 100,
-    'MAX_PAGE_SIZE': 500,
-    'MAX_RELATION_DEPTH': 2,
-    'MAX_FILTER_CONDITIONS': 10,
-    'MAX_NODES': 100,
-    'ALLOWED_APPS': [],        # Empty = all apps allowed
-    'RESTRICTED_MODELS': [],   # Models blocked from all endpoints
+    "DEFAULT_APP_LABEL": "myapp",   # pre-select this app in the UI
+    "PAGE_SIZE": 100,               # default page size
+    "MAX_PAGE_SIZE": 500,           # hard cap per request
+    "MAX_RELATION_DEPTH": 2,        # how deep relation graphs expand
+    "MAX_FILTER_CONDITIONS": 10,    # max filter nodes per query
+    "MAX_NODES": 100,               # max records returned by neighborhood
+    "ALLOWED_APPS": [],             # restrict to specific app labels (empty = all)
+    "RESTRICTED_MODELS": [],        # block specific model names globally
+    "ENVIRONMENT_LABEL": "Production", # set qlab env
 }
 ```
 
 ---
 
-## Usage Examples
+## API surface
 
-### Simple Query
+All routes are mounted relative to the prefix you chose (e.g. `/qlab/`):
 
-```json
-POST /api/query/
-{
-  "model": "Book",
-  "select_fields": ["id", "title", "published", "author__first_name"]
-}
-```
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/` | Bundled React UI |
+| `GET` | `/api/bootstrap/` | Initial data load (models, settings) |
+| `POST` | `/api/query/` | Run a filtered, paginated query |
+| `POST` | `/api/metadata/` | Model field and relation schema |
+| `POST` | `/api/neighborhood/` | Relation graph for a set of records |
+| `GET / PATCH` | `/api/settings/` | Per-user UI settings |
+| `GET / POST` | `/api/saved-queries/` | List and create saved queries |
+| `GET / PATCH / DELETE` | `/api/saved-queries/<id>/` | Manage a single saved query |
+| `POST` | `/api/saved-queries/<id>/run/` | Execute a saved query |
+| `GET` | `/api/history/` | Query run history |
 
-Response:
-
-```json
-{
-  "count": 250,
-  "page": 1,
-  "page_size": 100,
-  "total_pages": 3,
-  "next": 2,
-  "previous": null,
-  "results": [
-    { "id": 1, "title": "Django for Beginners", "published": true, "author__first_name": "Anna" }
-  ]
-}
-```
-
-### Query with Filters
+### Example query payload
 
 ```json
-POST /api/query/
 {
-  "model": "Book",
-  "select_fields": ["id", "title", "author__first_name"],
+  "model": "Device",
+  "app_label": "myapp",
+  "select_fields": ["id", "name", "status", "region"],
   "filter_fields": {
     "and_operation": [
-      { "field": "published", "op": "is", "value": "true" },
-      { "field": "author__first_name", "op": "icontains", "value": "Anna" }
-    ]
-  }
-}
-```
-
-### Reverse Relation Filter
-
-```json
-POST /api/query/
-{
-  "model": "Author",
-  "select_fields": ["id", "first_name", "last_name"],
-  "filter_fields": {
-    "and_operation": [
-      { "field": "book__published", "op": "is", "value": "true" }
-    ]
-  }
-}
-```
-
-### Complex Nested Filters
-
-```json
-POST /api/query/
-{
-  "model": "Book",
-  "select_fields": ["id", "title"],
-  "filter_fields": {
-    "and_operation": [
-      { "field": "published", "op": "is", "value": "true" }
-    ],
-    "or_operation": [
-      { "field": "author__first_name", "op": "is", "value": "Anna" },
-      { "field": "author__first_name", "op": "is", "value": "Max" }
-    ],
-    "not_operation": [
-      { "field": "author__mail", "op": "icontains", "value": "@spam.com" }
-    ]
-  }
-}
-```
-
-### Neighborhood Resolution
-
-```json
-POST /api/neighborhood/
-{
-  "model": "Author",
-  "node_ids": ["1", "2"]
-}
-```
-
-Response:
-
-```json
-{
-  "model": "core.Author",
-  "records": [
-    {
-      "nodeId": "1",
-      "relations": {
-        "book": { "pks": [1, 5, 12], "filter_name": "book" },
-        "publisher": { "pks": [3], "filter_name": "publisher" }
+      {
+        "or_operation": [
+          { "field": "status", "op": "is", "value": "active" },
+          { "field": "status", "op": "is", "value": "maintenance" }
+        ]
+      },
+      {
+        "or_operation": [
+          { "field": "region", "op": "is", "value": "DE" },
+          { "field": "region", "op": "is", "value": "AT" }
+        ]
       }
-    }
-  ]
+    ]
+  },
+  "page": 1,
+  "page_size": 100
 }
 ```
 
-### Get Model Metadata
+---
 
-```json
-POST /api/metadata/
-{
-  "model": "Book"
-}
-```
+## UI capabilities
 
-Response:
+- **Dashboard** — model counts, saved query count and recent activity
+- **Query builder** — field picker, nested `(a or b) and (x or y)` filter groups, CSV export, JSON copy
+- **Models browser** — field types, nullability, filterable flags, relation inspection
+- **Saved queries** — create, update, delete, bulk delete and run from the UI
+- **History** — replay past runs, save from history, filter by model and time range
+- **Settings** — page size, default app, theme
+- **Light and dark mode**
 
-```json
-{
-  "model_name": "Book",
-  "app_label": "core",
-  "primary_key_field": "id",
-  "fields": [
-    {
-      "name": "id",
-      "type": "integer",
-      "label": "ID",
-      "required": true,
-      "primary_key": true,
-      "allowed_operations": ["is", "is_not", "lt", "lte", "gt", "gte"]
-    },
-    {
-      "name": "author",
-      "type": "foreignkey",
-      "label": "Author",
-      "required": true,
-      "allowed_operations": ["is", "is_not"],
-      "related_model": "Author"
-    }
-  ],
-  "all_lookups": ["author", "author__first_name", "author__last_name", "id", "published", "title"]
-}
-```
+---
 
-### Custom Queryset Scoping
+## Django admin
 
-Override `get_queryset()` to restrict which records are accessible:
+The package registers the following models in Django admin:
 
-```python
-class QLab(QLabMixin, NeighborhoodMixin, QLabMetadataMixin, viewsets.ViewSet):
-    permission_classes = [IsAuthenticated]
-
-    def get_queryset(self, model):
-        # Only return records belonging to the user's tenant
-        return model.objects.filter(tenant=self.request.user.tenant)
-```
+| Model | Description |
+|---|---|
+| `QLabUserSettings` | Per-user theme, page size and active tab |
+| `SavedQuery` | Stored query payloads with metadata |
+| `QueryRunHistory` | Execution log with status, duration and result snapshot |
 
 ---
 
 ## Requirements
 
-- Python >= 3.9
-- Django >= 4.0
-- djangorestframework >= 3.14
-- pydantic >= 2.0
-- drf-spectacular >= 0.27
+| Package | Version |
+|---|---|
+| Python | ≥ 3.9 |
+| Django | ≥ 4.0 |
+| djangorestframework | ≥ 3.14 |
+| pydantic | ≥ 2.0 |
+| drf-spectacular | ≥ 0.26 |
 
 ---
 
-## Development
+## Frontend development
+
+This section is for maintainers working on the UI itself. Package consumers do not need npm.
 
 ```bash
-# Clone repository
-git clone https://github.com/tabeahoehne132/django-qlab.git
-cd django-qlab
-
-# Install in development mode
-pip install -e ".[dev]"
-
-# Run tests
-pytest
+cd frontend
+npm install
+npm run dev       # dev server with HMR
+npm run build     # write compiled assets to qlab/static/qlab/
 ```
+
+---
+
+## License
+
+MIT

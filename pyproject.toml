@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["poetry-core>=1.5.0"]
+build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "django-qlab"
-version = "0.2.2"
+version = "0.3.2"
 description = "Dynamic query API for Django REST Framework"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -15,7 +15,18 @@ authors = [
 keywords = ["django", "rest", "api", "query", "filter", "metadata"]
 classifiers = [
     "Framework :: Django",
+    "Framework :: Django :: 4.0",
+    "Framework :: Django :: 4.1",
+    "Framework :: Django :: 4.2",
+    "Framework :: Django :: 5.0",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: MIT License",
+    "Intended Audience :: Developers",
+    "Topic :: Internet :: WWW/HTTP",
 ]
 
 dependencies = [
@@ -31,9 +42,46 @@ dev = [
     "pytest-django>=4.5",
     "black>=23.0",
     "ruff>=0.1",
+    "pre-commit>=4.0",
+    "build>=1.2",
+    "twine>=5.1",
 ]
 
 [project.urls]
 Homepage = "https://github.com/tabeahoehne132/django-qlab"
 Documentation = "https://github.com/tabeahoehne132/django-qlab#readme"
 Repository = "https://github.com/tabeahoehne132/django-qlab"
+
+[tool.poetry]
+packages = [{include = "qlab"}]
+include = [
+    "qlab/templates/**/*",
+    "qlab/static/**/*",
+]
+
+[tool.black]
+line-length = 88
+target-version = ["py39"]
+extend-exclude = """
+(
+  qlab/static/qlab/.*|
+  build/.*|
+  django_qlab\\.egg-info/.*|
+  frontend/.*|
+  docs/.*\\.svg
+)
+"""
+
+[tool.ruff]
+line-length = 88
+target-version = "py39"
+extend-exclude = [
+    "build",
+    "django_qlab.egg-info",
+    "frontend",
+    "qlab/static/qlab",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = ["E501"]

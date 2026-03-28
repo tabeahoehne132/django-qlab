@@ -9,8 +9,9 @@ This module defines the core validation models used in the dynamic query system:
 These models ensure type safety and validate query structure before execution.
 """
 
+from typing import List, Optional, Union
+
 from pydantic import BaseModel, field_validator
-from typing import List, Union, Optional
 
 
 class ValidationError(Exception):

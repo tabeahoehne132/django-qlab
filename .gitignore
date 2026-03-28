@@ -1,0 +1,15 @@
+.venv/
+
+__pycache__/
+*.py[cod]
+
+frontend/node_modules/
+frontend/dist/
+dist/
+.local-consumer/
+.local-demo/
+
+qlab/static/qlab/index.html
+build/
+scripts/
+*.egg-info/

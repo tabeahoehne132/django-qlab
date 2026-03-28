@@ -1,0 +1,31 @@
+.placeholder-page {
+  display: flex;
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px;
+  flex-direction: column;
+  gap: 14px;
+  background: var(--bg);
+}
+
+.placeholder-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  gap: 12px;
+  color: var(--muted);
+}
+
+.placeholder-icon {
+  font-size: 2.5rem;
+  opacity: 0.3;
+}
+
+.placeholder-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
