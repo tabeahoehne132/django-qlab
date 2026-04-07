@@ -20,15 +20,11 @@ from qlab.settings import qlab_settings
 @lru_cache(maxsize=32)
 def _get_models_index(
     allowed_apps: tuple[str, ...],
-    restricted_models: tuple[str, ...],
     include_model_counts: bool,
 ):
-    restricted = {item.lower() for item in restricted_models}
     rows = []
     for model in apps.get_models():
         if allowed_apps and model._meta.app_label not in allowed_apps:
-            continue
-        if model.__name__.lower() in restricted:
             continue
 
         row = {
@@ -157,7 +153,6 @@ class QLabBootstrapViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
         settings_obj, _ = QLabUserSettings.objects.get_or_create(user=request.user)
         models_index = _get_models_index(
             tuple(qlab_settings.ALLOWED_APPS or ()),
-            tuple(qlab_settings.RESTRICTED_MODELS or ()),
             bool(qlab_settings.INCLUDE_MODEL_COUNTS),
         )
 

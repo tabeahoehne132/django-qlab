@@ -143,7 +143,6 @@ const DOCS_ENTRIES: DocsEntry[] = [
     ],
     params: [
       { name: 'permission_classes', type: 'list', description: 'DRF permission classes on the ViewSet.' },
-      { name: 'RESTRICTED_MODELS', type: 'list', description: 'Block models globally.' },
     ],
     code: `class QLab(QLabMixin, viewsets.ViewSet):\n    permission_classes = [IsAuthenticated]\n\n    def get_queryset(self, model):\n        return model.objects.filter(tenant=self.request.user.tenant)`,
   },

@@ -62,7 +62,7 @@ def _check_restricted(
     model_obj = ModelRegistry.objects.filter(
         model_name__iexact=model_name, app_label=app_label
     ).first()
-    print(model_obj)
+
     if not model_obj or model_obj.status != "enabled":
         restricted = True
     elif model_obj.is_restricted:
