@@ -1,5 +1,3 @@
-from functools import lru_cache
-
 from django.apps import apps
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
@@ -8,7 +6,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from qlab.mixins import NeighborhoodMixin, QLabMetadataMixin, QLabMixin
-from qlab.models import QLabUserSettings, QueryRunHistory, SavedQuery
+from qlab.models import ModelRegistry, QLabUserSettings, QueryRunHistory, SavedQuery
 from qlab.serializers import (
     QLabUserSettingsSerializer,
     QueryRunHistorySerializer,
@@ -17,19 +15,24 @@ from qlab.serializers import (
 from qlab.settings import qlab_settings
 
 
-@lru_cache(maxsize=32)
 def _get_models_index(
     allowed_apps: tuple[str, ...],
     include_model_counts: bool,
 ):
+    enabled = ModelRegistry.objects.filter(status="enabled")
+    if allowed_apps:
+        enabled = enabled.filter(app_label__in=allowed_apps)
+
     rows = []
-    for model in apps.get_models():
-        if allowed_apps and model._meta.app_label not in allowed_apps:
+    for entry in enabled:
+        try:
+            model = apps.get_model(entry.app_label, entry.model_name)
+        except LookupError:
             continue
 
         row = {
-            "app_label": model._meta.app_label,
-            "model_name": model.__name__,
+            "app_label": entry.app_label,
+            "model_name": entry.model_name,
             "verbose_name": str(model._meta.verbose_name),
             "verbose_name_plural": str(model._meta.verbose_name_plural),
             "count": None,
