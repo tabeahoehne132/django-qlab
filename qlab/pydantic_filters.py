@@ -12,7 +12,7 @@ QueryFilter performs comprehensive validation before query execution,
 ensuring type safety and preventing invalid database queries.
 """
 
-from typing import Optional
+from typing import Literal, Optional
 
 from django.apps import apps
 from pydantic import BaseModel, field_validator, model_validator
@@ -20,12 +20,46 @@ from pydantic import BaseModel, field_validator, model_validator
 from qlab.helpers import (
     check_attribute_operation,
     flatten_filter_conditions,
+    is_numeric_field_path,
     is_valid_lookup_syntax,
     model_exists,
     validate_field_path,
 )
 from qlab.model_validation import Filter, ValidationError
 from qlab.settings import qlab_settings
+
+
+class AggregationSpec(BaseModel):
+    """
+    A single aggregation to compute alongside select_fields.
+
+    select_fields act as the GROUP BY columns — each aggregation is computed
+    per group (e.g. number of devices per team).
+
+    Attributes:
+        field: Field path to aggregate (e.g. "devices" for count, or
+            "devices__size" for sum/avg/min/max).
+        function: Aggregate function to apply.
+        alias: Result key for the computed value. Defaults to
+            "{function}_{field}" if not given.
+        distinct: Aggregate only distinct values of field (e.g. count of
+            distinct regions rather than count of all matching rows).
+
+    Example:
+        >>> AggregationSpec(field="devices", function="count")
+        AggregationSpec(field='devices', function='count', alias='count_devices', distinct=False)
+    """
+
+    field: str
+    function: Literal["count", "sum", "avg", "min", "max"]
+    alias: Optional[str] = None
+    distinct: bool = False
+
+    @model_validator(mode="after")
+    def set_default_alias(self):
+        if not self.alias:
+            self.alias = f"{self.function}_{self.field}"
+        return self
 
 
 class QueryFilter(BaseModel):
@@ -85,6 +119,7 @@ class QueryFilter(BaseModel):
     model: str
     select_fields: list[str]
     filter_fields: Optional[Filter] = None
+    aggregations: list[AggregationSpec] = []
     page: int = 1
     app_label: Optional[str] = None
 
@@ -238,6 +273,39 @@ class QueryFilter(BaseModel):
                                 "type": "operation_not_allowed",
                             }
                         )
+
+        # --- Validate Aggregations ---
+        max_aggregations = qlab_settings.MAX_AGGREGATIONS
+        if len(self.aggregations) > max_aggregations:
+            errors.append(
+                {
+                    "loc": ["aggregations"],
+                    "msg": f"Too many aggregations. Maximum allowed is {max_aggregations}.",
+                    "type": "value_error.max_aggregations",
+                }
+            )
+        else:
+            for agg in self.aggregations:
+                valid_field = self._validate_field(model, agg.field, errors)
+
+                # sum/avg on a non-numeric field silently returns 0 on some
+                # database backends (SQLite in particular) instead of
+                # raising — this can't be left to the database to catch.
+                if (
+                    valid_field
+                    and agg.function in ("sum", "avg")
+                    and not is_numeric_field_path(model, agg.field)
+                ):
+                    errors.append(
+                        {
+                            "loc": ("aggregations", agg.field),
+                            "msg": (
+                                f"Aggregation '{agg.function}' requires a numeric "
+                                f"field; '{agg.field}' is not numeric."
+                            ),
+                            "type": "value_error.aggregation_field_type",
+                        }
+                    )
 
         # Raise all collected errors at once for better UX
         if errors:

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { NavSidebar, TabId, ThemeMode } from './components/NavSidebar'
+import { TopNav, TabId, ThemeMode } from './components/TopNav'
 import { ContentSidebar, DocsNavGroup, RecentQuery } from './components/ContentSidebar'
+import { HomePage } from './pages/HomePage'
 import { QueriesPage } from './pages/QueriesPage'
 import {
   DocsEntry,
@@ -31,6 +32,7 @@ import {
   runQuery,
   updateSavedQuery,
 } from './lib/api'
+import { setUrlParam } from './lib/url'
 import './App.css'
 
 
@@ -98,6 +100,7 @@ const DOCS_ENTRIES: DocsEntry[] = [
       { name: 'model', type: 'string', description: 'Target Django model name.' },
       { name: 'select_fields', type: 'array', description: 'Field paths returned in each result row.' },
       { name: 'filter_fields', type: 'object', description: 'AND/OR/NOT filter tree.' },
+      { name: 'aggregations', type: 'array', description: 'Aggregate values computed per group of select_fields.' },
     ],
     code: `POST /api/query/\n{\n  "model": "Device",\n  "select_fields": ["id", "name", "status"],\n  "filter_fields": {\n    "and_operation": [\n      { "field": "status", "op": "is", "value": "active" }\n    ]\n  }\n}`,
   },
@@ -116,6 +119,23 @@ const DOCS_ENTRIES: DocsEntry[] = [
       { name: 'not_operation', type: 'array', description: 'Excluded conditions.' },
     ],
     code: `{\n  "filter_fields": {\n    "and_operation": [\n      { "field": "status", "op": "is", "value": "active" }\n    ],\n    "or_operation": [\n      { "field": "region", "op": "is", "value": "DE" },\n      { "field": "region", "op": "is", "value": "AT" }\n    ]\n  }\n}`,
+  },
+  {
+    key: 'aggregations',
+    section: 'API Reference',
+    title: 'Aggregations',
+    tagline: 'Compute count, sum, avg, min and max per group of select_fields.',
+    intro: 'select_fields act as the GROUP BY columns — each aggregation is computed per group and returned as an extra key on every result row. Rows collapse to one per unique combination of select_fields, so aggregating a to-many relation never duplicates rows. sum and avg require a numeric field.',
+    endpoints: [
+      { method: 'POST', path: '/api/query/', description: 'add aggregations to a query payload' },
+    ],
+    params: [
+      { name: 'field', type: 'string', description: 'Field path to aggregate (e.g. devices or devices__size).' },
+      { name: 'function', type: 'string', description: 'One of count, sum, avg, min, max.' },
+      { name: 'alias', type: 'string', description: 'Result key; defaults to {function}_{field}.' },
+      { name: 'distinct', type: 'boolean', description: 'Count only distinct values (count only).' },
+    ],
+    code: `POST /api/query/\n{\n  "model": "Team",\n  "select_fields": ["id", "name"],\n  "aggregations": [\n    { "field": "devices", "function": "count" },\n    { "field": "devices__owner", "function": "count",\n      "distinct": true, "alias": "distinct_owners" }\n  ]\n}\n\n// result rows:\n// { "id": 1, "name": "Ops",\n//   "count_devices": 17, "distinct_owners": 3 }`,
   },
   {
     key: 'pagination',
@@ -222,6 +242,7 @@ const DOCS_GROUPS: DocsNavGroup[] = [
     items: [
       { key: 'query-params', label: 'Query Params' },
       { key: 'filtering', label: 'Filtering' },
+      { key: 'aggregations', label: 'Aggregations' },
       { key: 'pagination', label: 'Pagination' },
       { key: 'permissions', label: 'Permissions' },
     ],
@@ -273,7 +294,7 @@ const getMetadataCacheKey = (modelName: string, appLabel?: string) =>
 // ─── App ─────────────────────────────────────────────────────────────────────
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<TabId>('queries')
+  const [activeTab, setActiveTab] = useState<TabId>('home')
   const [activeModel, setActiveModel] = useState<string>('')
   const [activeDocsKey, setActiveDocsKey] = useState<string>('overview')
   const [theme, setTheme] = useState<ThemeMode>(() => {
@@ -306,15 +327,19 @@ export default function App() {
   const [toasts, setToasts] = useState<ToastItem[]>([])
 
   const normalizeTab = (tab: string | null | undefined): TabId => {
+    if (tab === 'models') {
+      return 'schema'
+    }
     switch (tab) {
-      case 'models':
+      case 'home':
+      case 'queries':
+      case 'schema':
       case 'saved':
       case 'history':
       case 'docs':
-      case 'queries':
         return tab
       default:
-        return 'queries'
+        return 'home'
     }
   }
 
@@ -347,8 +372,25 @@ export default function App() {
         setHistoryItems(bootstrap.history)
         setSavedQueries(bootstrap.saved_queries)
         setActiveSavedQueryId(bootstrap.saved_queries[0]?.id ?? null)
-        setActiveModel(bootstrap.models[0] ? modelKey(bootstrap.models[0].app_label, bootstrap.models[0].model_name) : '')
-        setActiveTab(normalizeTab(bootstrap.settings.last_active_tab))
+
+        const urlParams = new URLSearchParams(window.location.search)
+        const urlModel = urlParams.get('model')
+        const firstModel = bootstrap.models[0]
+          ? modelKey(bootstrap.models[0].app_label, bootstrap.models[0].model_name)
+          : ''
+        const validUrlModel =
+          urlModel && bootstrap.models.some((m) => modelKey(m.app_label, m.model_name) === urlModel)
+            ? urlModel
+            : null
+        if (urlModel && !validUrlModel) {
+          pushToast('error', 'The model in this link is not available to you.')
+          // The shared fields/filters were scoped to a model this user can't see — don't
+          // let them leak onto whichever fallback model ends up active.
+          setUrlParam('fields', null)
+          setUrlParam('filters', null)
+        }
+        setActiveModel(validUrlModel ?? firstModel)
+        setActiveTab(validUrlModel ? 'queries' : normalizeTab(bootstrap.settings.last_active_tab))
         setActiveDocsKey(bootstrap.settings.active_docs_key || 'overview')
         setDefaultPageSize(bootstrap.settings.default_page_size || 100)
         setTheme(bootstrap.settings.theme || 'dark')
@@ -408,6 +450,15 @@ export default function App() {
     settingsReady,
     theme,
   ])
+
+  useEffect(() => {
+    if (!activeModel) return
+    setUrlParam('model', activeModel)
+  }, [activeModel])
+
+  useEffect(() => {
+    document.querySelector('.app-content')?.scrollTo(0, 0)
+  }, [activeTab])
 
   const activeModelEntry = bootstrapModels.find((model) => modelKey(model.app_label, model.model_name) === activeModel)
   const activeMetadataKey = activeModelEntry ? getMetadataCacheKey(activeModelEntry.model_name, activeModelEntry.app_label) : ''
@@ -664,42 +715,24 @@ export default function App() {
     return <div className="app-screen"><div className="app-screen-panel error"><strong>QLab failed to load</strong><span>{bootstrapError}</span></div></div>
   }
 
+  const homeStats = {
+    totalModels: bootstrapModels.length,
+    totalApps: new Set(bootstrapModels.map((model) => model.app_label)).size,
+    queriesThisWeek: historyItems.filter((item) => now - new Date(item.created_at).getTime() <= 7 * 24 * 60 * 60 * 1000).length,
+    savedQueriesCount: savedQueries.length,
+  }
+
   return (
     <>
-      <NavSidebar
+      <TopNav
         activeTab={activeTab}
         onTabChange={setActiveTab}
         theme={theme}
         onThemeToggle={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')}
+        version="v0.4.0"
       />
 
-      <ContentSidebar
-        activeTab={activeTab}
-        models={models}
-        recentQueries={recentQueries}
-        recentModelNames={recentModelNames}
-        activeModel={activeModel}
-        savedQueries={savedQueryNavItems}
-        activeSavedQueryId={activeSavedQueryId}
-        historyModelOptions={Object.keys(historyModelCounts).map((label) => ({ label }))}
-        activeHistoryModel={activeHistoryModel}
-        onHistoryModelSelect={setActiveHistoryModel}
-        activeHistoryRange={activeHistoryRange}
-        onHistoryRangeSelect={setActiveHistoryRange}
-        docsGroups={DOCS_GROUPS}
-        activeDocsKey={activeDocsKey}
-        onDocsSelect={setActiveDocsKey}
-        onModelSelect={handleModelSelect}
-        onSavedQuerySelect={(id) => {
-          setActiveSavedQueryId(id)
-          setActiveTab('saved')
-        }}
-        onToggleModelFavorite={handleToggleModelFavorite}
-        onRecentQuerySelect={handleRecentQuerySelect}
-        environment={bootstrapConfig.environment}
-      />
-
-      <div className="app-body">
+      <div className="app-content">
         <div className="toast-stack">
           {toasts.map((toast) => (
             <div key={toast.id} className={`toast-item ${toast.tone}`}>
@@ -707,6 +740,37 @@ export default function App() {
             </div>
           ))}
         </div>
+
+        {activeTab === 'home' && <HomePage stats={homeStats} />}
+
+        {activeTab !== 'home' && (
+          <div className="page-row">
+            <ContentSidebar
+              activeTab={activeTab}
+              models={models}
+              recentQueries={recentQueries}
+              recentModelNames={recentModelNames}
+              activeModel={activeModel}
+              savedQueries={savedQueryNavItems}
+              activeSavedQueryId={activeSavedQueryId}
+              historyModelOptions={Object.keys(historyModelCounts).map((label) => ({ label }))}
+              activeHistoryModel={activeHistoryModel}
+              onHistoryModelSelect={setActiveHistoryModel}
+              activeHistoryRange={activeHistoryRange}
+              onHistoryRangeSelect={setActiveHistoryRange}
+              docsGroups={DOCS_GROUPS}
+              activeDocsKey={activeDocsKey}
+              onDocsSelect={setActiveDocsKey}
+              onModelSelect={handleModelSelect}
+              onSavedQuerySelect={(id) => {
+                setActiveSavedQueryId(id)
+                setActiveTab('saved')
+              }}
+              onToggleModelFavorite={handleToggleModelFavorite}
+              onRecentQuerySelect={handleRecentQuerySelect}
+            />
+
+            <div className="page-main">
         {activeTab === 'queries' && (
               <QueriesPage
                 activeModel={activeModelEntry?.model_name || ''}
@@ -749,25 +813,21 @@ export default function App() {
               }
             }}
             onRunQuery={async (payload) => {
-              try {
-                const response = await runQuery(payload)
-                await refreshHistory()
-                if (payload.saved_query_id) {
-                  setSavedQueries((current) => current.map((entry) => (
-                    entry.id === payload.saved_query_id
-                      ? { ...entry, last_run_at: new Date().toISOString() }
-                      : entry
-                  )))
-                }
-                return response
-              } catch (error) {
-                pushToast('error', error instanceof Error ? error.message : 'Query failed.')
-                throw error
+              // Errors surface inline in QueriesPage via .query-error, not as a toast, to avoid duplicate messaging.
+              const response = await runQuery(payload)
+              await refreshHistory()
+              if (payload.saved_query_id) {
+                setSavedQueries((current) => current.map((entry) => (
+                  entry.id === payload.saved_query_id
+                    ? { ...entry, last_run_at: new Date().toISOString() }
+                    : entry
+                )))
               }
+              return response
             }}
               />
         )}
-        {activeTab === 'models' && (
+        {activeTab === 'schema' && (
           <ModelsPage
             models={models}
             activeModel={activeModel}
@@ -843,6 +903,9 @@ export default function App() {
         )}
         {activeTab === 'docs' && (
           <DocsPage docs={DOCS_ENTRIES} activeDocKey={activeDocsKey} />
+        )}
+            </div>
+          </div>
         )}
       </div>
     </>
