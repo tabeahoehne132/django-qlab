@@ -139,7 +139,6 @@ QLAB_SETTINGS = {
     "MAX_FILTER_CONDITIONS": 10,    # max filter nodes per query
     "MAX_NODES": 100,               # max records returned by neighborhood
     "ALLOWED_APPS": [],             # restrict to specific app labels (empty = all)
-    "RESTRICTED_MODELS": [],        # block specific model names globally
     "ENVIRONMENT_LABEL": "Production", # set qlab env
 }
 ```
@@ -214,6 +213,14 @@ The package registers the following models in Django admin:
 | `QLabUserSettings` | Per-user theme, page size and active tab |
 | `SavedQuery` | Stored query payloads with metadata |
 | `QueryRunHistory` | Execution log with status, duration and result snapshot |
+
+---
+
+## Caching
+
+`model_exists()` uses `lru_cache` for performance. The cache is cleared on
+process restart. If you register new models at runtime, make sure to restart
+your application server (e.g. Gunicorn) to reflect the changes.
 
 ---
 

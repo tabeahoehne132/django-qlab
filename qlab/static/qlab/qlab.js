@@ -99,7 +99,7 @@ python manage.py collectstatic`},{key:"quick-start",section:"Getting Started",ti
   "total_pages": 3,
   "next": 2,
   "previous": null
-}`},{key:"permissions",section:"API Reference",title:"Permissions",tagline:"QLab follows the permissions and scoping rules of the host project.",intro:"The package does not replace your authorization model. Apply DRF permission classes and per-model scoping in the hosting ViewSet.",endpoints:[{method:"POST",path:"/api/query/",description:"protected by your DRF permissions"}],params:[{name:"permission_classes",type:"list",description:"DRF permission classes on the ViewSet."},{name:"RESTRICTED_MODELS",type:"list",description:"Block models globally."}],code:`class QLab(QLabMixin, viewsets.ViewSet):
+}`},{key:"permissions",section:"API Reference",title:"Permissions",tagline:"QLab follows the permissions and scoping rules of the host project.",intro:"The package does not replace your authorization model. Apply DRF permission classes and per-model scoping in the hosting ViewSet.",endpoints:[{method:"POST",path:"/api/query/",description:"protected by your DRF permissions"}],params:[{name:"permission_classes",type:"list",description:"DRF permission classes on the ViewSet."}],code:`class QLab(QLabMixin, viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self, model):
