@@ -623,6 +623,127 @@ def validate_field_path(model, field_path: str, errors: list) -> bool:
         return validate_field_path(related_model, remaining_path, errors)
 
 
+def find_to_many_relation_paths(model, field_path: str) -> List[str]:
+    """
+    Walk a dunder field path and return every to-many relation it crosses
+    (reverse foreign key, reverse many-to-many, or forward many-to-many).
+
+    A to-many relation makes Django JOIN and return multiple rows per base
+    object (e.g. one row per Team per Device). Ordering by the base object's
+    pk alone leaves those rows in an arbitrary relative order, which can make
+    LIMIT/OFFSET pagination split or duplicate rows across page boundaries.
+    Callers use the returned relation paths to add each one's own pk as a
+    secondary sort key, making the row order fully deterministic.
+
+    Args:
+        model: Django model class the path starts from.
+        field_path: Dunder-separated field path (e.g. "devices__name").
+
+    Returns:
+        Relation paths crossed, in traversal order (e.g. ["devices"], or
+        ["device_groups", "device_groups__devices"] for a path crossing two
+        to-many relations in sequence). Empty list if the path never crosses
+        one (safe to sort without a tiebreaker).
+    """
+    RELATION_TYPES = (
+        ForeignKey,
+        ManyToManyField,
+        OneToOneField,
+        ManyToOneRel,
+        ManyToManyRel,
+        OneToOneRel,
+    )
+    MANY_TYPES = (ManyToManyField, ManyToOneRel, ManyToManyRel)
+
+    parts = field_path.split("__")
+    current_model = model
+    relation_paths = []
+
+    for index, part in enumerate(parts):
+        try:
+            field = current_model._meta.get_field(part)
+        except FieldDoesNotExist:
+            field = None
+
+        if field is None:
+            for f in current_model._meta.get_fields():
+                if isinstance(f, (ManyToOneRel, ManyToManyRel, OneToOneRel)):
+                    accessor = f.related_name or f.related_model._meta.model_name
+                    if accessor == part:
+                        field = f
+                        break
+
+        if field is None or not isinstance(field, RELATION_TYPES):
+            break
+
+        if isinstance(field, MANY_TYPES):
+            relation_paths.append("__".join(parts[: index + 1]))
+
+        current_model = (
+            field.related_model
+            if hasattr(field, "related_model")
+            else field.field.model
+        )
+
+    return relation_paths
+
+
+NUMERIC_FIELD_TYPES = {
+    "integer",
+    "bigint",
+    "smallint",
+    "positiveint",
+    "float",
+    "decimal",
+}
+
+
+def is_numeric_field_path(model, field_path: str) -> bool:
+    """
+    Check whether a dunder field path resolves to a numeric field.
+
+    Used to validate sum/avg aggregations before query execution: some
+    database backends (SQLite in particular) silently return 0 for
+    Sum()/Avg() on a non-numeric column instead of raising an error, so this
+    can't be left to the database to catch.
+
+    Args:
+        model: Django model class the path starts from.
+        field_path: Dunder-separated field path (e.g. "devices__id").
+
+    Returns:
+        True if the path resolves to a numeric field, False if it resolves
+        to a non-numeric field or doesn't resolve at all.
+    """
+    parts = field_path.split("__")
+    current_model = model
+    field = None
+
+    for part in parts:
+        try:
+            field = current_model._meta.get_field(part)
+        except FieldDoesNotExist:
+            field = None
+            for f in current_model._meta.get_fields():
+                if isinstance(f, (ManyToOneRel, ManyToManyRel, OneToOneRel)):
+                    accessor = f.related_name or f.related_model._meta.model_name
+                    if accessor == part:
+                        field = f
+                        break
+
+        if field is None:
+            return False
+
+        if hasattr(field, "related_model") or hasattr(field, "field"):
+            current_model = (
+                field.related_model
+                if hasattr(field, "related_model")
+                else field.field.model
+            )
+
+    return field is not None and get_field_type_name(field) in NUMERIC_FIELD_TYPES
+
+
 @lru_cache(maxsize=512)
 def model_exists(model_name: str, app_label: str | None = None):
     """

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react'
 import {
+  AggregationFunction,
   MetadataField,
   MetadataResponse,
   QueryCondition,
@@ -8,6 +9,7 @@ import {
   QueryRequest,
   QueryResponse,
 } from '../lib/api'
+import { setUrlParam } from '../lib/url'
 import './QueriesPage.css'
 
 type FilterOp = 'is' | 'is_not' | 'icontains' | 'lt' | 'lte' | 'gt' | 'gte'
@@ -84,6 +86,16 @@ const DEFAULT_OPERATIONS: FilterOp[] = [
   'gte',
 ]
 
+const AGGREGATION_FUNCTIONS: AggregationFunction[] = ['count', 'sum', 'avg', 'min', 'max']
+
+interface AggregationRow {
+  id: string
+  field: string
+  function: AggregationFunction
+  distinct: boolean
+  alias: string
+}
+
 const splitIdentifier = (value: string) =>
   value
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
@@ -108,22 +120,6 @@ const IconPlay = () => (
     strokeLinejoin="round"
   >
     <polygon points="5 3 19 12 5 21 5 3" />
-  </svg>
-)
-
-const IconPlus = () => (
-  <svg
-    width="12"
-    height="12"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <line x1="12" y1="5" x2="12" y2="19" />
-    <line x1="5" y1="12" x2="19" y2="12" />
   </svg>
 )
 
@@ -157,6 +153,48 @@ const IconDownload = () => (
     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
     <polyline points="7 10 12 15 17 10" />
     <line x1="12" y1="15" x2="12" y2="3" />
+  </svg>
+)
+
+function getRelativeTime(date: Date): string {
+  const secs = Math.floor((Date.now() - date.getTime()) / 1000)
+  if (secs < 15) return 'just now'
+  if (secs < 60) return `${secs}s ago`
+  const mins = Math.floor(secs / 60)
+  if (mins < 60) return `${mins}m ago`
+  return `${Math.floor(mins / 60)}h ago`
+}
+
+const IconShare = () => (
+  <svg
+    width="12"
+    height="12"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.75"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+  </svg>
+)
+
+const IconSave = () => (
+  <svg
+    width="12"
+    height="12"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.75"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+    <polyline points="17 21 17 13 7 13 7 21" />
+    <polyline points="7 3 7 8 15 8" />
   </svg>
 )
 
@@ -378,6 +416,119 @@ const ResourceRow: React.FC<{
   </div>
 )
 
+const IconChevronDown = () => (
+  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="6 9 12 15 18 9" />
+  </svg>
+)
+
+interface DropdownOption<T extends string> {
+  value: T
+  label: string
+}
+
+interface DropdownProps<T extends string> {
+  value: T
+  options: DropdownOption<T>[]
+  onChange: (value: T) => void
+  className?: string
+  menuClassName?: string
+}
+
+function Dropdown<T extends string>({ value, options, onChange, className = '', menuClassName = '' }: DropdownProps<T>) {
+  const [open, setOpen] = useState(false)
+  const [highlightedIndex, setHighlightedIndex] = useState(-1)
+  const closeTimeout = useRef<number | null>(null)
+  const menuRef = useRef<HTMLDivElement | null>(null)
+  const current = options.find((option) => option.value === value)
+
+  const clearCloseTimer = () => {
+    if (closeTimeout.current) {
+      window.clearTimeout(closeTimeout.current)
+      closeTimeout.current = null
+    }
+  }
+
+  const selectOption = (option: DropdownOption<T>) => {
+    onChange(option.value)
+    setOpen(false)
+    setHighlightedIndex(-1)
+  }
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (event.key === 'ArrowDown') {
+      event.preventDefault()
+      if (!open) {
+        setOpen(true)
+        setHighlightedIndex(Math.max(options.findIndex((option) => option.value === value), 0))
+        return
+      }
+      const next = Math.min(highlightedIndex + 1, options.length - 1)
+      setHighlightedIndex(next)
+      menuRef.current?.children[next]?.scrollIntoView({ block: 'nearest' })
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault()
+      if (!open) {
+        setOpen(true)
+        setHighlightedIndex(Math.max(options.findIndex((option) => option.value === value), 0))
+        return
+      }
+      const next = Math.max(highlightedIndex - 1, 0)
+      setHighlightedIndex(next)
+      menuRef.current?.children[next]?.scrollIntoView({ block: 'nearest' })
+    } else if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      if (open && highlightedIndex >= 0) {
+        selectOption(options[highlightedIndex])
+      } else {
+        setOpen(true)
+      }
+    } else if (event.key === 'Escape') {
+      setOpen(false)
+      setHighlightedIndex(-1)
+    }
+  }
+
+  return (
+    <div
+      className={`dropdown${className ? ` ${className}` : ''}`}
+      onBlur={() => {
+        closeTimeout.current = window.setTimeout(() => setOpen(false), 120)
+      }}
+    >
+      <button
+        type="button"
+        className="dropdown-trigger"
+        onClick={() => {
+          clearCloseTimer()
+          setOpen((current) => !current)
+        }}
+        onKeyDown={handleKeyDown}
+      >
+        <span>{current?.label ?? value}</span>
+        <IconChevronDown />
+      </button>
+
+      {open && (
+        <div className={`field-autocomplete-menu dropdown-menu${menuClassName ? ` ${menuClassName}` : ''}`} ref={menuRef}>
+          {options.map((option, index) => (
+            <button
+              key={option.value}
+              type="button"
+              className={`field-picker-item${option.value === value ? ' selected' : ''}${index === highlightedIndex ? ' highlighted' : ''}`}
+              onMouseDown={(event) => event.preventDefault()}
+              onMouseEnter={() => setHighlightedIndex(index)}
+              onClick={() => selectOption(option)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 const FieldAutocomplete: React.FC<FieldAutocompleteProps> = ({
   value,
   rootModel,
@@ -400,7 +551,9 @@ const FieldAutocomplete: React.FC<FieldAutocompleteProps> = ({
     exactMatch: null,
     error: null,
   })
+  const [highlightedIndex, setHighlightedIndex] = useState(-1)
   const closeTimeout = useRef<number | null>(null)
+  const menuRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     setQuery(value)
@@ -421,6 +574,7 @@ const FieldAutocomplete: React.FC<FieldAutocompleteProps> = ({
         )
         if (active) {
           setResolution(nextResolution)
+          setHighlightedIndex(-1)
         }
       } catch {
         if (active) {
@@ -462,6 +616,7 @@ const FieldAutocomplete: React.FC<FieldAutocompleteProps> = ({
       const nextPath = `${suggestion.path}__`
       setQuery(nextPath)
       onChange(nextPath)
+      setHighlightedIndex(-1)
       setOpen(true)
       return
     }
@@ -470,6 +625,37 @@ const FieldAutocomplete: React.FC<FieldAutocompleteProps> = ({
     onChange(suggestion.path)
     setOpen(false)
     onSubmit?.(suggestion.path)
+  }
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    const visibleSuggestions = resolution.suggestions.filter(
+      (s) => !excludeFields?.includes(s.path),
+    )
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault()
+      if (!open) {
+        setOpen(true)
+        setHighlightedIndex(0)
+        return
+      }
+      const next = Math.min(highlightedIndex + 1, visibleSuggestions.length - 1)
+      setHighlightedIndex(next)
+      menuRef.current?.children[next]?.scrollIntoView({ block: 'nearest' })
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault()
+      const next = Math.max(highlightedIndex - 1, 0)
+      setHighlightedIndex(next)
+      menuRef.current?.children[next]?.scrollIntoView({ block: 'nearest' })
+    } else if (event.key === 'Enter') {
+      if (highlightedIndex >= 0 && visibleSuggestions[highlightedIndex]) {
+        event.preventDefault()
+        handleSuggestionClick(visibleSuggestions[highlightedIndex])
+      }
+    } else if (event.key === 'Escape') {
+      setOpen(false)
+      setHighlightedIndex(-1)
+    }
   }
 
   return (
@@ -494,10 +680,11 @@ const FieldAutocomplete: React.FC<FieldAutocompleteProps> = ({
           onChange(nextValue)
           setOpen(true)
         }}
+        onKeyDown={handleKeyDown}
       />
 
       {open && (
-        <div className="field-autocomplete-menu">
+        <div className="field-autocomplete-menu" ref={menuRef}>
           {loading && <div className="field-picker-empty">Loading fields…</div>}
           {!loading && resolution.error && (
             <div className="field-picker-empty">{resolution.error}</div>
@@ -505,26 +692,29 @@ const FieldAutocomplete: React.FC<FieldAutocompleteProps> = ({
           {!loading && !resolution.error && resolution.suggestions.length === 0 && (
             <div className="field-picker-empty">No matching fields.</div>
           )}
-          {!loading && !resolution.error && resolution.suggestions.filter((s) => !excludeFields?.includes(s.path)).map((suggestion) => (
-            <button
-              key={suggestion.path}
-              type="button"
-              className="field-picker-item"
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => handleSuggestionClick(suggestion)}
-            >
-              <span className="field-picker-item-path">{suggestion.path}</span>
-              {(suggestion.isRelation ||
-                suggestion.displayLabel.trim().toLowerCase() !==
-                  suggestion.path.replace(/__/g, ' ').trim().toLowerCase()) && (
-                <span className="field-picker-item-meta">
-                  {suggestion.isRelation
-                    ? `Relation → ${suggestion.relatedModel}`
-                    : suggestion.displayLabel}
-                </span>
-              )}
-            </button>
-          ))}
+          {!loading && !resolution.error && resolution.suggestions
+            .filter((s) => !excludeFields?.includes(s.path))
+            .map((suggestion, index) => (
+              <button
+                key={suggestion.path}
+                type="button"
+                className={`field-picker-item${index === highlightedIndex ? ' highlighted' : ''}`}
+                onMouseDown={(event) => event.preventDefault()}
+                onMouseEnter={() => setHighlightedIndex(index)}
+                onClick={() => handleSuggestionClick(suggestion)}
+              >
+                <span className="field-picker-item-path">{suggestion.path}</span>
+                {(suggestion.isRelation ||
+                  suggestion.displayLabel.trim().toLowerCase() !==
+                    suggestion.path.replace(/__/g, ' ').trim().toLowerCase()) && (
+                  <span className="field-picker-item-meta">
+                    {suggestion.isRelation
+                      ? `Relation → ${suggestion.relatedModel}`
+                      : suggestion.displayLabel}
+                  </span>
+                )}
+              </button>
+            ))}
         </div>
       )}
     </div>
@@ -562,17 +752,15 @@ const ConditionRow: React.FC<ConditionRowProps> = ({
       compact
     />
 
-    <select
-      className="fop"
+    <Dropdown
+      className="dropdown-op"
       value={node.op}
-      onChange={(event) => onChange(node.id, { op: event.target.value as FilterOp })}
-    >
-      {DEFAULT_OPERATIONS.map((operation) => (
-        <option key={operation} value={operation}>
-          {operation === 'is_not' ? 'is not' : operation}
-        </option>
-      ))}
-    </select>
+      options={DEFAULT_OPERATIONS.map((operation) => ({
+        value: operation,
+        label: operation === 'is_not' ? 'is not' : operation,
+      }))}
+      onChange={(op) => onChange(node.id, { op })}
+    />
 
     <input
       className="fval"
@@ -627,16 +815,15 @@ const FilterGroupEditor: React.FC<FilterGroupEditorProps> = ({
   <div className={`filter-group depth-${depth}`}>
     <div className="filter-group-head">
       <span className="filter-kw where">{isRoot ? 'WHERE' : 'GROUP'}</span>
-      <select
-        className="filter-group-operator"
+      <Dropdown
+        className="dropdown-group-op"
         value={node.operator}
-        onChange={(event) =>
-          onUpdateGroup(node.id, { operator: event.target.value as FilterJoiner })
-        }
-      >
-        <option value="and">AND</option>
-        <option value="or">OR</option>
-      </select>
+        options={[
+          { value: 'and', label: 'AND' },
+          { value: 'or', label: 'OR' },
+        ]}
+        onChange={(operator) => onUpdateGroup(node.id, { operator })}
+      />
       <button
         className="btn btn-ghost mini"
         type="button"
@@ -845,7 +1032,17 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
   const fallbackField = directFieldNames[0] || 'id'
   const hasAppliedPreset = useRef(false)
 
-  const [filters, setFilters] = useState<FilterGroupNode>(newGroup(fallbackField, 'and'))
+  const [filters, setFilters] = useState<FilterGroupNode>(() => {
+    const urlFilters = new URLSearchParams(window.location.search).get('filters')
+    if (urlFilters) {
+      try {
+        return deserializeFilters(JSON.parse(atob(urlFilters)) as QueryFilterGroup, fallbackField)
+      } catch {
+        // malformed/legacy share link — fall back to an empty filter group below
+      }
+    }
+    return newGroup(fallbackField, 'and')
+  })
   const [limit, setLimit] = useState(defaultPageSize || 100)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -854,11 +1051,18 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
   const [sortField, setSortField] = useState('id')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [results, setResults] = useState<QueryResponse | null>(null)
-  const [selectedFields, setSelectedFields] = useState<string[]>([])
+  const [selectedFields, setSelectedFields] = useState<string[]>(() => {
+    const urlFields = new URLSearchParams(window.location.search).get('fields')
+    return urlFields ? urlFields.split(',').filter(Boolean) : []
+  })
+  const [aggregations, setAggregations] = useState<AggregationRow[]>([])
   const [isFieldPickerOpen, setIsFieldPickerOpen] = useState(false)
   const [fieldSearch, setFieldSearch] = useState('')
   const [copyState, setCopyState] = useState<'idle' | 'done' | 'error'>('idle')
   const [csvState, setCsvState] = useState<'idle' | 'done'>('idle')
+  const [shareState, setShareState] = useState<'idle' | 'done'>('idle')
+  const [lastRunAt, setLastRunAt] = useState<Date | null>(null)
+  const [relativeTime, setRelativeTime] = useState('')
   const [saveDialogOpen, setSaveDialogOpen] = useState(false)
   const [saveName, setSaveName] = useState('')
   const [saveDescription, setSaveDescription] = useState('')
@@ -868,6 +1072,16 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
   const fieldPickerRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
+    setError(null)
+  }, [activeModel])
+
+  useEffect(() => {
+    // While metadata is still loading, activeMetadata is undefined and directFieldNames is
+    // transiently empty — leave any URL-restored filters/fields alone until it resolves.
+    if (!activeMetadata) {
+      return
+    }
+
     if (!directFieldNames.length) {
       setFilters(newGroup('', 'and'))
       setSelectedFields([])
@@ -894,7 +1108,29 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
       }
       return normalizeNode(current) as FilterGroupNode
     })
-  }, [activeModel, directFieldNames, fallbackField, validLookupNames])
+  }, [activeModel, activeMetadata, directFieldNames, fallbackField, validLookupNames])
+
+  useEffect(() => {
+    if (selectedFields.length === 0) return
+    setUrlParam('fields', selectedFields.join(','))
+  }, [selectedFields])
+
+  useEffect(() => {
+    const serialized = serializeFilters(filters)
+    if (serialized) {
+      setUrlParam('filters', btoa(JSON.stringify(serialized)))
+    } else {
+      setUrlParam('filters', null)
+    }
+  }, [filters])
+
+  useEffect(() => {
+    if (!lastRunAt) return
+    const update = () => setRelativeTime(getRelativeTime(lastRunAt))
+    update()
+    const id = window.setInterval(update, 30_000)
+    return () => window.clearInterval(id)
+  }, [lastRunAt])
 
   useEffect(() => {
     if (!queryPreset || hasAppliedPreset.current) {
@@ -914,6 +1150,7 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
 
     if (resultsPreset) {
       setResults(resultsPreset)
+      setLastRunAt(new Date())
       setSelectedRow(null)
       setSortField(Object.keys(resultsPreset.results[0] || {})[0] || 'id')
       onPresetApplied?.()
@@ -1009,13 +1246,6 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
     return node
   }
 
-  const handleAddFilter = () => {
-    if (!fallbackField) {
-      return
-    }
-    setFilters((current) => appendToGroup(current, current.id, newCondition(fallbackField)) as FilterGroupNode)
-  }
-
   const handleConditionChange = (id: string, patch: Partial<FilterConditionNode>) => {
     setFilters((current) =>
       updateNode(current, id, (node) =>
@@ -1088,11 +1318,38 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
     setSortDir('asc')
   }
 
+  const addAggregation = () => {
+    setAggregations((current) => [
+      ...current,
+      { id: newId(), field: fallbackField, function: 'count', distinct: false, alias: '' },
+    ])
+  }
+
+  const updateAggregation = (id: string, patch: Partial<AggregationRow>) => {
+    setAggregations((current) => current.map((row) => (row.id === id ? { ...row, ...patch } : row)))
+  }
+
+  const removeAggregation = (id: string) => {
+    setAggregations((current) => current.filter((row) => row.id !== id))
+  }
+
   const buildPayload = (page: number): QueryRequest => ({
     model: activeModel,
     ...(activeAppLabel ? { app_label: activeAppLabel } : {}),
     select_fields: selectedFields.length > 0 ? selectedFields : ['id'],
     filter_fields: serializeFilters(filters),
+    ...(aggregations.some((row) => row.field.trim())
+      ? {
+          aggregations: aggregations
+            .filter((row) => row.field.trim())
+            .map((row) => ({
+              field: row.field,
+              function: row.function,
+              distinct: row.distinct,
+              ...(row.alias.trim() ? { alias: row.alias.trim() } : {}),
+            })),
+        }
+      : {}),
     page,
     page_size: limit,
     title: presetTitle || `${activeModelLabel || activeModel} query`,
@@ -1129,6 +1386,7 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
     try {
       const response = await onRunQuery(explicitPayload || buildPayload(page))
       setResults(response)
+      setLastRunAt(new Date())
       setSelectedRow(null)
       setSortField(Object.keys(response.results[0] || {})[0] || 'id')
     } catch (runError) {
@@ -1192,6 +1450,14 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
     URL.revokeObjectURL(url)
     setCsvState('done')
     window.setTimeout(() => setCsvState('idle'), 1600)
+  }
+
+  const handleShare = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href)
+      setShareState('done')
+      window.setTimeout(() => setShareState('idle'), 1600)
+    } catch {}
   }
 
   const rows = (results?.results || []) as ResultRow[]
@@ -1298,6 +1564,61 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
             )}
           </div>
 
+          <div className="aggregation-section">
+            <div className="aggregation-header">
+              <span className="from-label">AGGREGATE</span>
+              <button className="btn btn-ghost mini" type="button" onClick={addAggregation}>
+                + Aggregation
+              </button>
+            </div>
+            {aggregations.map((row) => (
+              <div key={row.id} className="aggregation-row">
+                <FieldAutocomplete
+                  value={row.field}
+                  rootModel={activeModel}
+                  rootAppLabel={activeAppLabel}
+                  rootMetadata={activeMetadata}
+                  onChange={(field) => updateAggregation(row.id, { field })}
+                  onRequestMetadata={onRequestMetadata}
+                  className="aggregation-field-autocomplete"
+                  compact
+                />
+                <Dropdown
+                  className="dropdown-op"
+                  value={row.function}
+                  options={AGGREGATION_FUNCTIONS.map((fn) => ({ value: fn, label: fn }))}
+                  onChange={(fn) => updateAggregation(row.id, { function: fn })}
+                />
+                {row.function === 'count' && (
+                  <label className="aggregation-distinct">
+                    <input
+                      type="checkbox"
+                      checked={row.distinct}
+                      onChange={(event) => updateAggregation(row.id, { distinct: event.target.checked })}
+                    />
+                    distinct
+                  </label>
+                )}
+                <input
+                  className="aggregation-alias"
+                  type="text"
+                  placeholder={`${row.function}_${row.field || 'field'}`}
+                  title="Result column name (optional)"
+                  value={row.alias}
+                  onChange={(event) => updateAggregation(row.id, { alias: event.target.value })}
+                />
+                <button
+                  className="remove-btn"
+                  type="button"
+                  onClick={() => removeAggregation(row.id)}
+                  title="Remove aggregation"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+
           <div className="filter-rows">
             <FilterGroupEditor
               node={filters}
@@ -1330,14 +1651,6 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
               <IconPlay />
               {isLoading ? 'Running…' : 'Run Query'}
             </button>
-            <button
-              className="btn btn-secondary"
-              title="Add a filter rule to the query"
-              onClick={handleAddFilter}
-              disabled={metadataLoading || directFieldNames.length === 0}
-            >
-              <IconPlus /> Add Rule
-            </button>
             {onSaveQuery && (
               <button
                 className="btn btn-secondary"
@@ -1349,9 +1662,17 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
                   selectedFields.length === 0
                 }
               >
-                Save Query
+                <IconSave /> Save Query
               </button>
             )}
+            <button
+              className="btn btn-ghost"
+              title="Copy shareable link to this query"
+              onClick={() => void handleShare()}
+              disabled={directFieldNames.length === 0}
+            >
+              <IconShare /> {shareState === 'done' ? 'Copied!' : 'Share'}
+            </button>
             {filters.children.length > 0 && (
               <button
                 className="btn btn-ghost"
@@ -1361,17 +1682,6 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
                 Clear
               </button>
             )}
-            <div className="limit-group">
-              <span className="limit-label">Limit</span>
-              <input
-                className="limit-input"
-                type="number"
-                value={limit}
-                min={1}
-                max={500}
-                onChange={(event) => setLimit(Number(event.target.value))}
-              />
-            </div>
           </div>
 
           {error && <div className="query-error">{error}</div>}
@@ -1466,6 +1776,11 @@ export const QueriesPage: React.FC<QueriesPageProps> = ({
             <div className="timing-pill">
               <span className="dot">●</span> {results.page_size} / page
             </div>
+            {lastRunAt && (
+              <div className={`timing-pill${Date.now() - lastRunAt.getTime() > 5 * 60_000 ? ' stale' : ''}`}>
+                {relativeTime}
+              </div>
+            )}
             <div className="card-actions-right">
               <button className="btn btn-ghost" onClick={() => void handleCopyJson()} title="Copy JSON">
                 <IconCopy />{' '}

@@ -102,11 +102,21 @@ export interface QueryFilterGroup {
   not_operation?: Array<QueryCondition | QueryFilterGroup>
 }
 
+export type AggregationFunction = 'count' | 'sum' | 'avg' | 'min' | 'max'
+
+export interface AggregationSpec {
+  field: string
+  function: AggregationFunction
+  alias?: string
+  distinct?: boolean
+}
+
 export interface QueryRequest {
   model: string
   app_label?: string
   select_fields: string[]
   filter_fields?: QueryFilterGroup
+  aggregations?: AggregationSpec[]
   page?: number
   page_size?: number
   title?: string
@@ -160,9 +170,17 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
     : null
 
   if (!response.ok) {
+    const firstFieldError =
+      payload && typeof payload === 'object' && !Array.isArray(payload)
+        ? Object.values(payload as Record<string, unknown>).find(
+            (value): value is string[] =>
+              Array.isArray(value) && typeof value[0] === 'string',
+          )?.[0]
+        : undefined
     const message =
       payload?.detail ||
       payload?.errors?.[0]?.msg ||
+      firstFieldError ||
       `Request failed with status ${response.status}`
     throw new Error(message)
   }

@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react'
-import { TabId } from './NavSidebar'
+import { TabId } from './TopNav'
+import { handleActivationKeyDown, handleRovingKeyDown } from '../lib/keyboardNav'
 import './ContentSidebar.css'
 
 export interface ModelEntry {
@@ -62,7 +63,6 @@ interface ContentSidebarProps {
   onSavedQuerySelect?: (id: number) => void
   onToggleModelFavorite?: (name: string) => void
   onRecentQuerySelect: (q: RecentQuery) => void
-  environment?: string
 }
 
 function normalizeQuery(value: string) {
@@ -85,6 +85,13 @@ function groupModels(models: ModelEntry[]) {
       entries: entries.sort((left, right) => left.name.localeCompare(right.name)),
     }))
 }
+
+const IconSearch = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" className="sidebar-search-icon">
+    <circle cx="10" cy="10" r="6.5" stroke="currentColor" strokeWidth="2" />
+    <line x1="14.8" y1="14.8" x2="20" y2="20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+  </svg>
+)
 
 const FavoriteButton: React.FC<{
   active: boolean
@@ -111,9 +118,13 @@ const ModelListItem: React.FC<{
 }> = ({ model, active, onSelect, onToggleFavorite }) => (
   <div
     className={`res-item${active ? ' active' : ''}`}
+    role="button"
+    tabIndex={0}
+    data-roving-item
     onClick={() => onSelect(model.name)}
+    onKeyDown={(event) => handleActivationKeyDown(event, () => onSelect(model.name))}
   >
-    <div className="res-pip" style={{ background: model.color, color: model.color }} />
+    <div className="res-pip" style={{ background: model.color }} />
     <span className="res-name">{model.displayName || model.name}</span>
     {onToggleFavorite && (
       <FavoriteButton active={Boolean(model.favorite)} onClick={() => onToggleFavorite(model.name)} />
@@ -125,13 +136,18 @@ const ModelSearch: React.FC<{
   value: string
   onChange: (value: string) => void
 }> = ({ value, onChange }) => (
-  <input
-    className="sidebar-search"
-    placeholder="Search models"
-    value={value}
-    onChange={(event) => onChange(event.target.value)}
-  />
+  <div className="sidebar-search-wrap">
+    <IconSearch />
+    <input
+      className="sidebar-search"
+      placeholder="Search models"
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+    />
+  </div>
 )
+
+const WIDE_TABS: TabId[] = ['queries', 'schema']
 
 export const ContentSidebar: React.FC<ContentSidebarProps> = ({
   activeTab,
@@ -153,18 +169,11 @@ export const ContentSidebar: React.FC<ContentSidebarProps> = ({
   onSavedQuerySelect,
   onToggleModelFavorite,
   onRecentQuerySelect,
-  environment = 'LOCAL · DEV',
 }) => {
-  return (
-    <aside className="content-sidebar">
-      <div className="csidebar-head">
-        <div className="csidebar-context">Environment</div>
-        <div className="csidebar-env">
-          <div className="env-dot" />
-          {environment}
-        </div>
-      </div>
+  const wide = WIDE_TABS.includes(activeTab)
 
+  return (
+    <div className={`page-sidebar${wide ? ' wide' : ' narrow'}`}>
       {activeTab === 'queries' && (
         <QueriesSidebarPanel
           models={models}
@@ -177,8 +186,8 @@ export const ContentSidebar: React.FC<ContentSidebarProps> = ({
         />
       )}
 
-      {activeTab === 'models' && (
-        <ModelsSidebarPanel
+      {activeTab === 'schema' && (
+        <SchemaSidebarPanel
           models={models}
           recentModelNames={recentModelNames}
           activeModel={activeModel}
@@ -212,7 +221,7 @@ export const ContentSidebar: React.FC<ContentSidebarProps> = ({
           onSelect={onDocsSelect}
         />
       )}
-    </aside>
+    </div>
   )
 }
 
@@ -252,7 +261,7 @@ const QueryModelPanel: React.FC<QueryModelPanelProps> = ({
   const grouped = groupModels(filteredModels)
 
   return (
-    <div>
+    <div onKeyDown={handleRovingKeyDown}>
       <ModelSearch value={search} onChange={setSearch} />
 
       {favorites.length > 0 && (
@@ -267,7 +276,6 @@ const QueryModelPanel: React.FC<QueryModelPanelProps> = ({
               onToggleFavorite={onToggleModelFavorite}
             />
           ))}
-          <div className="sidebar-divider" />
         </>
       )}
 
@@ -283,7 +291,6 @@ const QueryModelPanel: React.FC<QueryModelPanelProps> = ({
               onToggleFavorite={onToggleModelFavorite}
             />
           ))}
-          <div className="sidebar-divider" />
         </>
       )}
 
@@ -321,8 +328,8 @@ const QueriesSidebarPanel: React.FC<QueriesSidebarPanelProps> = ({
   onToggleModelFavorite,
   onRecentQuerySelect,
 }) => (
-  <div className="sidebar-panel active">
-    <div className="csidebar-body">
+  <>
+    <div className="sidebar-card">
       <QueryModelPanel
         models={models}
         recentModelNames={recentModelNames}
@@ -330,49 +337,60 @@ const QueriesSidebarPanel: React.FC<QueriesSidebarPanelProps> = ({
         onModelSelect={onModelSelect}
         onToggleModelFavorite={onToggleModelFavorite}
       />
-      <div className="sidebar-divider" />
-      <div>
-        <div className="sidebar-label">Recent Queries</div>
-        {recentQueries.map((query, index) => (
-          <div
-            key={`${query.title}-${index}`}
-            className="recent-item"
-            onClick={() => onRecentQuerySelect(query)}
-          >
-            <div className="recent-title">{query.title}</div>
-            <div className="recent-meta">{query.meta}</div>
-          </div>
-        ))}
-      </div>
     </div>
-  </div>
+    <div className="sidebar-card" onKeyDown={handleRovingKeyDown}>
+      <div className="sidebar-label">Recent Queries</div>
+      {recentQueries.length === 0 && (
+        <div className="sidebar-empty">Nothing yet — run a query to see it here.</div>
+      )}
+      {recentQueries.map((query, index) => (
+        <div
+          key={`${query.title}-${index}`}
+          className="recent-item"
+          role="button"
+          tabIndex={0}
+          data-roving-item
+          onClick={() => onRecentQuerySelect(query)}
+          onKeyDown={(event) => handleActivationKeyDown(event, () => onRecentQuerySelect(query))}
+        >
+          <div className="recent-title">{query.title}</div>
+          <div className="recent-meta">{query.meta}</div>
+        </div>
+      ))}
+    </div>
+  </>
 )
 
-interface ModelsSidebarPanelProps extends QueryModelPanelProps {}
+interface SchemaSidebarPanelProps extends QueryModelPanelProps {}
 
-const ModelsSidebarPanel: React.FC<ModelsSidebarPanelProps> = ({
+const SchemaSidebarPanel: React.FC<SchemaSidebarPanelProps> = ({
   models,
   recentModelNames,
   activeModel,
   onModelSelect,
   onToggleModelFavorite,
 }) => (
-  <div className="sidebar-panel active">
-    <div className="csidebar-body">
-      <QueryModelPanel
-        models={models}
-        recentModelNames={recentModelNames}
-        activeModel={activeModel}
-        onModelSelect={onModelSelect}
-        onToggleModelFavorite={onToggleModelFavorite}
-      />
-    </div>
+  <div className="sidebar-card">
+    <QueryModelPanel
+      models={models}
+      recentModelNames={recentModelNames}
+      activeModel={activeModel}
+      onModelSelect={onModelSelect}
+      onToggleModelFavorite={onToggleModelFavorite}
+    />
   </div>
 )
 
-const PassiveSidebarItem: React.FC<{ item: SidebarChoice }> = ({ item }) => (
-  <div className={`res-item${item.active ? ' active' : ''}`}>
-    {item.color && <div className="res-pip" style={{ background: item.color, color: item.color }} />}
+const PassiveSidebarItem: React.FC<{ item: SidebarChoice; onClick?: () => void }> = ({ item, onClick }) => (
+  <div
+    className={`res-item${item.active ? ' active' : ''}`}
+    role="button"
+    tabIndex={0}
+    data-roving-item
+    onClick={onClick}
+    onKeyDown={(event) => onClick && handleActivationKeyDown(event, onClick)}
+  >
+    {item.color && <div className="res-pip" style={{ background: item.color }} />}
     <span className="res-name">{item.label}</span>
   </div>
 )
@@ -384,31 +402,29 @@ const HistorySidebarPanel: React.FC<{
   activeRange: 'all' | 'today' | '7d' | '30d'
   onSelectRange?: (range: 'all' | 'today' | '7d' | '30d') => void
 }> = ({ modelOptions, activeModel, onSelectModel, activeRange, onSelectRange }) => (
-  <div className="sidebar-panel active">
-    <div className="csidebar-body">
-      <div>
-        <div className="sidebar-label">Filter by Model</div>
-        <div onClick={() => onSelectModel?.('all')}>
-          <PassiveSidebarItem
-            item={{ label: 'All Models', active: activeModel === 'all' }}
-          />
-        </div>
-        {modelOptions.map((item) => (
-          <div key={item.label} onClick={() => onSelectModel?.(item.label)}>
-            <PassiveSidebarItem item={{ label: item.label, active: activeModel === item.label }} />
-          </div>
-        ))}
-      </div>
-      <div className="sidebar-divider" />
-      <div>
-        <div className="sidebar-label">Time Range</div>
-        <div onClick={() => onSelectRange?.('all')}><PassiveSidebarItem item={{ label: 'All Time', active: activeRange === 'all' }} /></div>
-        <div onClick={() => onSelectRange?.('today')}><PassiveSidebarItem item={{ label: 'Today', active: activeRange === 'today' }} /></div>
-        <div onClick={() => onSelectRange?.('7d')}><PassiveSidebarItem item={{ label: 'Last 7 days', active: activeRange === '7d' }} /></div>
-        <div onClick={() => onSelectRange?.('30d')}><PassiveSidebarItem item={{ label: 'Last 30 days', active: activeRange === '30d' }} /></div>
-      </div>
+  <>
+    <div className="sidebar-card" onKeyDown={handleRovingKeyDown}>
+      <div className="sidebar-label">Filter by Model</div>
+      <PassiveSidebarItem
+        item={{ label: 'All Models', active: activeModel === 'all' }}
+        onClick={() => onSelectModel?.('all')}
+      />
+      {modelOptions.map((item) => (
+        <PassiveSidebarItem
+          key={item.label}
+          item={{ label: item.label, active: activeModel === item.label }}
+          onClick={() => onSelectModel?.(item.label)}
+        />
+      ))}
     </div>
-  </div>
+    <div className="sidebar-card" onKeyDown={handleRovingKeyDown}>
+      <div className="sidebar-label">Time Range</div>
+      <PassiveSidebarItem item={{ label: 'All Time', active: activeRange === 'all' }} onClick={() => onSelectRange?.('all')} />
+      <PassiveSidebarItem item={{ label: 'Today', active: activeRange === 'today' }} onClick={() => onSelectRange?.('today')} />
+      <PassiveSidebarItem item={{ label: 'Last 7 days', active: activeRange === '7d' }} onClick={() => onSelectRange?.('7d')} />
+      <PassiveSidebarItem item={{ label: 'Last 30 days', active: activeRange === '30d' }} onClick={() => onSelectRange?.('30d')} />
+    </div>
+  </>
 )
 
 const SavedSidebarPanel: React.FC<{
@@ -416,23 +432,23 @@ const SavedSidebarPanel: React.FC<{
   activeId?: number | null
   onSelect?: (id: number) => void
 }> = ({ queries, activeId, onSelect }) => (
-  <div className="sidebar-panel active">
-    <div className="csidebar-body">
-      <div>
-        <div className="sidebar-label">Saved Queries</div>
-        {queries.length === 0 && <div className="sidebar-empty">No saved queries yet.</div>}
-        {queries.map((query) => (
-          <div
-            key={query.id}
-            className={`recent-item saved-query-item${activeId === query.id ? ' active' : ''}`}
-            onClick={() => onSelect?.(query.id)}
-          >
-                    <div className="recent-title">{query.name}</div>
-                    <div className="recent-meta">{query.modelLabel || query.modelName} · {new Date(query.updatedAt).toLocaleDateString()}</div>
-          </div>
-        ))}
+  <div className="sidebar-card" onKeyDown={handleRovingKeyDown}>
+    <div className="sidebar-label">Saved Queries</div>
+    {queries.length === 0 && <div className="sidebar-empty">No saved queries yet.</div>}
+    {queries.map((query) => (
+      <div
+        key={query.id}
+        className={`recent-item saved-query-item${activeId === query.id ? ' active' : ''}`}
+        role="button"
+        tabIndex={0}
+        data-roving-item
+        onClick={() => onSelect?.(query.id)}
+        onKeyDown={(event) => handleActivationKeyDown(event, () => onSelect?.(query.id))}
+      >
+        <div className="recent-title">{query.name}</div>
+        <div className="recent-meta">{query.modelLabel || query.modelName} · {new Date(query.updatedAt).toLocaleDateString()}</div>
       </div>
-    </div>
+    ))}
   </div>
 )
 
@@ -442,25 +458,27 @@ const DocsSidebarPanel: React.FC<{
   activeKey?: string
   onSelect?: (key: string) => void
 }> = ({ groups, activeKey, onSelect }) => (
-  <div className="sidebar-panel active docs-sidebar-panel">
-    <div className="csidebar-body docs-sidebar-body">
-      {groups.map((group, index) => (
-        <React.Fragment key={group.label}>
-          {index > 0 && <div className="sidebar-divider docs-sidebar-divider" />}
-          <div className="docs-sidebar-group">
-            <div className="sidebar-label">{group.label}</div>
-            {group.items.map((item) => (
-              <div
-                key={item.key}
-                className={`res-item${activeKey === item.key ? ' active' : ''}`}
-                onClick={() => onSelect?.(item.key)}
-              >
-                <span className="res-name">{item.label}</span>
-              </div>
-            ))}
-          </div>
-        </React.Fragment>
-      ))}
-    </div>
+  <div className="sidebar-card" onKeyDown={handleRovingKeyDown}>
+    {groups.map((group, index) => (
+      <React.Fragment key={group.label}>
+        {index > 0 && <div className="sidebar-divider docs-sidebar-divider" />}
+        <div className="docs-sidebar-group">
+          <div className="sidebar-label">{group.label}</div>
+          {group.items.map((item) => (
+            <div
+              key={item.key}
+              className={`res-item${activeKey === item.key ? ' active' : ''}`}
+              role="button"
+              tabIndex={0}
+              data-roving-item
+              onClick={() => onSelect?.(item.key)}
+              onKeyDown={(event) => handleActivationKeyDown(event, () => onSelect?.(item.key))}
+            >
+              <span className="res-name">{item.label}</span>
+            </div>
+          ))}
+        </div>
+      </React.Fragment>
+    ))}
   </div>
 )

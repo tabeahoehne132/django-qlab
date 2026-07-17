@@ -13,3 +13,4 @@ qlab/static/qlab/index.html
 build/
 scripts/
 *.egg-info/
+.claude/

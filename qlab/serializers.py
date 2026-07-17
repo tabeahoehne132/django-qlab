@@ -216,6 +216,20 @@ class SavedQuerySerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("model_name is required.")
         return value
 
+    def validate_name(self, value: str) -> str:
+        request = self.context.get("request")
+        if request is None or not value:
+            return value
+
+        queryset = SavedQuery.objects.filter(user=request.user, name=value)
+        if self.instance is not None:
+            queryset = queryset.exclude(pk=self.instance.pk)
+        if queryset.exists():
+            raise serializers.ValidationError(
+                "You already have a saved query with this name."
+            )
+        return value
+
     def validate(self, attrs):
         attrs = super().validate(attrs)
         if not attrs.get("app_label"):

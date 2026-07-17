@@ -1,0 +1,155 @@
+.home-page {
+  display: flex;
+  flex-direction: column;
+  gap: 44px;
+}
+
+.home-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-bottom: 14px;
+}
+
+.home-card {
+  background: var(--bg-card);
+  border: 1px solid var(--line-10);
+  border-radius: 6px;
+  padding: 22px 26px;
+}
+
+.home-release-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.home-release-version {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.home-release-date {
+  font-size: 12.5px;
+  color: var(--text-muted2);
+}
+
+.home-release-notes {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.home-release-notes li {
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.home-history {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+}
+
+.home-history-row {
+  display: flex;
+  gap: 24px;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--line-07);
+}
+
+.home-history-row:last-child {
+  border-bottom: none;
+}
+
+.home-history-version {
+  width: 56px;
+  flex-shrink: 0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.home-history-summary {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.home-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.home-stat-card {
+  background: var(--bg-card);
+  border: 1px solid var(--line-10);
+  border-radius: 6px;
+  padding: 16px;
+}
+
+.home-stat-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.home-stat-label {
+  font-size: 12px;
+  color: var(--text-muted2);
+  margin-top: 4px;
+}
+
+.home-roadmap {
+  padding: 6px 26px;
+}
+
+.home-roadmap-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line-07);
+}
+
+.home-roadmap-row:last-child {
+  border-bottom: none;
+}
+
+.home-roadmap-label {
+  flex: 1;
+  font-size: 13.5px;
+  color: var(--text-primary);
+}
+
+.home-roadmap-badge {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+  border: 1px solid var(--line-16);
+  border-radius: 4px;
+  padding: 4px 9px;
+}
+
+.home-roadmap-badge.active {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: transparent;
+}
+
+@media (max-width: 720px) {
+  .home-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

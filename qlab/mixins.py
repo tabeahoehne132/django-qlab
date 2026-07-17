@@ -18,13 +18,18 @@ from typing import Optional
 from django.apps import apps
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
-from django.db.models import Q
+from django.db.models import Avg, Count, Max, Min, Q, Sum
 from django.utils import timezone
 from drf_spectacular.utils import OpenApiExample, extend_schema, inline_serializer
 from rest_framework import serializers
 from rest_framework.response import Response
 
-from qlab.helpers import build_q, get_model_metadata
+from qlab.helpers import (
+    build_q,
+    find_to_many_relation_paths,
+    flatten_filter_conditions,
+    get_model_metadata,
+)
 from qlab.model_validation import ValidationError
 from qlab.pydantic_filters import QueryFilter
 from qlab.serializers import (
@@ -186,6 +191,7 @@ class QLabMixin:
                 model=payload["model"],
                 select_fields=payload["select_fields"],
                 filter_fields=payload.get("filter_fields", None),
+                aggregations=payload.get("aggregations", []),
                 page=payload.get("page", 1),
                 app_label=payload.get("app_label", qlab_settings.DEFAULT_APP_LABEL),
             )
@@ -285,14 +291,62 @@ class QLabMixin:
         if not pk_included:
             select_fields = [pk_field] + select_fields
 
+        AGGREGATE_FUNCTIONS = {
+            "count": Count,
+            "sum": Sum,
+            "avg": Avg,
+            "min": Min,
+            "max": Max,
+        }
+        aggregate_kwargs = {
+            agg.alias: AGGREGATE_FUNCTIONS[agg.function](
+                agg.field, distinct=agg.distinct
+            )
+            for agg in query.aggregations
+        }
+
+        if aggregate_kwargs:
+            # select_fields are the GROUP BY columns here — annotate() folds
+            # every matching related row into one aggregate value per group,
+            # so there's no row-level duplication to guard against. Ordering
+            # by the group-by columns themselves is already fully
+            # deterministic: their combination is unique per output row by
+            # construction of GROUP BY. (Using pk_field here instead would
+            # pull it into the GROUP BY and silently break the aggregation,
+            # since every row already has a distinct id.)
+            order_fields = list(select_fields)
+        else:
+            # Collect every to-many relation (reverse FK / M2M) crossed by
+            # select_fields or filter_fields. Such a relation makes Django
+            # JOIN and duplicate the base row once per related record;
+            # ordering by the base pk alone leaves those duplicate rows in
+            # an arbitrary relative order, which can make LIMIT/OFFSET
+            # pagination split or duplicate rows across page boundaries.
+            # Adding each relation's own pk as a secondary sort key makes
+            # the row order fully deterministic.
+            to_many_relations: list[str] = []
+            for field_name in select_fields:
+                for relation_path in find_to_many_relation_paths(model, field_name):
+                    if relation_path not in to_many_relations:
+                        to_many_relations.append(relation_path)
+            if filter_fields:
+                for condition in flatten_filter_conditions(query.filter_fields):
+                    for relation_path in find_to_many_relation_paths(
+                        model, condition.field
+                    ):
+                        if relation_path not in to_many_relations:
+                            to_many_relations.append(relation_path)
+
+            order_fields = [pk_field] + [
+                f"{relation}__pk" for relation in to_many_relations
+            ]
+
         # Apply custom scoping via get_queryset(), then apply QLab filters on top
         try:
-            raw_results = (
-                self.get_queryset(model)
-                .filter(q_obj)
-                .order_by("id")
-                .values(*select_fields)
-            )
+            raw_results = self.get_queryset(model).filter(q_obj).values(*select_fields)
+            if aggregate_kwargs:
+                raw_results = raw_results.annotate(**aggregate_kwargs)
+            raw_results = raw_results.order_by(*order_fields)
 
             page_size = min(
                 payload.get("page_size", qlab_settings.PAGE_SIZE),
