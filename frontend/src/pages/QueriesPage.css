@@ -61,7 +61,7 @@
   margin-bottom: 16px;
   flex-wrap: wrap;
   position: relative;
-  z-index: 20;
+  z-index: auto;
 }
 
 .field-hint {
@@ -153,7 +153,7 @@
   position: absolute;
   top: calc(100% + 8px);
   left: 0;
-  z-index: 140;
+  z-index: 1000;
   width: min(440px, calc(100vw - 96px));
   padding: 12px;
   border: 1px solid var(--border2);
@@ -224,7 +224,7 @@
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
-  z-index: 160;
+  z-index: 1000;
   width: max(100%, 280px);
   border: 1px solid var(--border2);
   border-radius: 6px;
@@ -436,7 +436,7 @@
   flex: 1 1 180px;
   min-width: 0;
   position: relative;
-  z-index: 130;
+  z-index: auto;
 }
 
 .aggregation-distinct {
@@ -487,7 +487,7 @@
   flex: 1 1 180px;
   min-width: 0;
   position: relative;
-  z-index: 125;
+  z-index: auto;
 }
 
 .filter-field-picker {
@@ -623,10 +623,20 @@
 }
 
 .dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  z-index: 1000;
   width: 130px !important;
   min-width: 100%;
   left: auto;
   right: 0;
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  background: var(--surface);
+  box-shadow: var(--shadow-pop);
+  overflow: auto;
+  max-height: min(36vh, 280px);
+  padding: 4px;
 }
 
 .field-picker-item.selected {

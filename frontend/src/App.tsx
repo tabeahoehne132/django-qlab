@@ -729,7 +729,7 @@ export default function App() {
         onTabChange={setActiveTab}
         theme={theme}
         onThemeToggle={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')}
-        version="v0.4.0"
+        version="v0.4.1"
       />
 
       <div className="app-content">

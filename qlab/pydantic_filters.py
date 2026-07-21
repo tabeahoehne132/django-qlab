@@ -239,6 +239,14 @@ class QueryFilter(BaseModel):
         errors = []
 
         # --- Validate Select Fields ---
+        if not self.select_fields:
+            errors.append(
+                {
+                    "loc": ("select_fields",),
+                    "msg": "At least one field must be selected.",
+                    "type": "value_error.empty_select_fields",
+                }
+            )
         for field in self.select_fields:
             self._validate_field(model, field, errors)
 

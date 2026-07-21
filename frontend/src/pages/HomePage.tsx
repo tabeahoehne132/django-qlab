@@ -18,12 +18,12 @@ interface RoadmapItem {
   status: 'In progress' | 'Planned'
 }
 
-const CURRENT_VERSION = 'v0.4.0'
+const CURRENT_VERSION = 'v0.4.1'
 const CURRENT_RELEASE_DATE = 'Jul 15, 2026'
 const CURRENT_RELEASE_NOTES = [
   'Fixed a pagination bug where querying a to-many relation (reverse foreign keys or many-to-many fields) could duplicate or drop rows across pages.',
   'Added aggregations to the query engine — count, sum, avg, min, and max, with optional distinct.',
-  "Fixed a server crash when saving a query under a name you'd already used; now shows a clear validation message instead.",
+  "Fixed a error when saving a query under a name you'd already used; now shows a clear validation message instead.",
   "Sharing a query now reliably restores its filters, and never leaks fields from a model you don't have access to.",
   'Redesigned the UI: new top navigation, consistent dropdowns, full keyboard/arrow-key navigation, and a responsive layout.',
 ]
